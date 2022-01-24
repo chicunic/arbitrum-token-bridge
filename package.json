@@ -1,0 +1,45 @@
+{
+  "name": "arbitrum-token-bridge",
+  "version": "0.0.1",
+  "description": "arbitrum token bridge for ERC20 & ERC721",
+  "license": "MIT",
+  "private": true,
+  "repository": "git@github.com:cy92830/arbitrum-token-bridge.git",
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "start": "node app.js",
+    "lint": "eslint ./"
+  },
+  "workspaces": [
+    "packages/erc20",
+    "packages/erc721"
+  ],
+  "pre-commit": [
+    "lint"
+  ],
+  "devDependencies": {
+    "@nomiclabs/hardhat-etherscan": "^3.0.0",
+    "@nomiclabs/hardhat-waffle": "^2.0.2",
+    "arb-bridge-peripherals": "^1.0.5",
+    "arb-ts": "^1.0.2",
+    "chai": "^4.3.4",
+    "eslint": "^8.7.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.25.4",
+    "ethers": "^5.5.3",
+    "hardhat-gas-reporter": "^1.0.7",
+    "pre-commit": "^1.2.2",
+    "prettier": "^2.5.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.19",
+    "solhint": "^3.3.6",
+    "solidity-coverage": "^0.7.18"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts-0.8": "npm:@openzeppelin/contracts",
+    "@openzeppelin/contracts-upgradeable-0.8": "npm:@openzeppelin/contracts-upgradeable",
+    "dotenv": "^14.2.0",
+    "hardhat": "^2.8.3"
+  }
+}

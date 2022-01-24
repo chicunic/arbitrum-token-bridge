@@ -1,0 +1,12 @@
+env:
+  commonjs: true
+  es2021: true
+  node: true
+extends:
+  - airbnb-base
+parserOptions:
+  ecmaVersion: latest
+rules:
+  max-classes-per-file: 0
+  max-len: [2, { code: 160, ignoreComments: true, ignoreTemplateLiterals: true, ignoreUrls: true }]
+  no-console: 0

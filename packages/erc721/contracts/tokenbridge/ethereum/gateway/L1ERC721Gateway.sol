@@ -56,7 +56,6 @@ contract L1ERC721Gateway is L1ArbitrumExtendedGateway, ICustomGateway {
     }
 
     // end of inline reentrancy guard
-
     function outboundTransfer(
         address _l1Token,
         address _to,

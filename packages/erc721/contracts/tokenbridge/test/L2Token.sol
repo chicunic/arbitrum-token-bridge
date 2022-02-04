@@ -26,6 +26,12 @@ interface IArbToken {
      */
     function bridgeMint(address account, uint256 tokenId) external;
 
+    function bridgeMint(
+        address account,
+        uint256 tokenId,
+        bytes memory data
+    ) external;
+
     /**
      * @notice should decrease token supply by amount, and should (probably) only be callable by the L1 bridge.
      */
@@ -58,6 +64,14 @@ contract L2Token is ERC721, IArbToken {
     }
 
     function bridgeMint(address account, uint256 tokenId) external override onlyL2Gateway {
+        _mint(account, tokenId);
+    }
+
+    function bridgeMint(
+        address account,
+        uint256 tokenId,
+        bytes memory
+    ) external override onlyL2Gateway {
         _mint(account, tokenId);
     }
 

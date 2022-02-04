@@ -36,49 +36,25 @@ contract L2ERC721Gateway is L2ArbitrumGateway, ICustomGateway {
      * @notice internal utility function used to handle when no contract is deployed at expected address
      */
     function handleNoContract(
-        address _l1Token,
+        address,
         address, /* expectedL2Address */
-        address _from,
+        address,
         address, /* _to */
-        uint256 _tokenId,
+        uint256,
         bytes memory /* gatewayData */
     ) internal override returns (bool shouldHalt) {
-        // it is assumed that the custom token is deployed in the L2 before deposits are made
-        // trigger withdrawal
-        // we don't need the return value from triggerWithdrawal since this is forcing a withdrawal back to the L1
-        // instead of composing with a L2 dapp
-        triggerWithdrawal(_l1Token, address(this), _from, _tokenId, "");
         return true;
-    }
-
-    function outboundEscrowTransfer(
-        address,
-        address,
-        uint256 _tokenId
-    ) internal override returns (uint256 tokenIdBurnt) {
-        // uint256 prevBalance = IERC721(_l2Token).balanceOf(_from);
-
-        // in the custom gateway, we do the same behaviour as the superclass, but actually check
-        // for the balances of tokens to ensure that inflationary / deflationary changes in the tokenId
-        // are taken into account
-        // we ignore the return value since we actually query the token before and after to calculate
-        // the tokenId of tokens that were burnt
-        // super.outboundEscrowTransfer(_l2Token, _from, _tokenId);
-
-        // uint256 postBalance = IERC721(_l2Token).balanceOf(_from);
-        // return SafeMath.sub(prevBalance, postBalance);
-        return _tokenId;
     }
 
     /**
      * @notice Calculate the address used when bridging an ERC721 token
      * @dev the L1 and L2 address oracles may not always be in sync.
      * For example, a custom token may have been registered but not deploy or the contract self destructed.
-     * @param l1ERC721 address of L1 token
+     * @param l1Token address of L1 token
      * @return L2 address of a bridged ERC721 token
      */
-    function calculateL2TokenAddress(address l1ERC721) public view override returns (address) {
-        return l1ToL2Token[l1ERC721];
+    function calculateL2TokenAddress(address l1Token) public view override returns (address) {
+        return l1ToL2Token[l1Token];
     }
 
     function registerTokenFromL1(address[] calldata l1Address, address[] calldata l2Address) external onlyCounterpartGateway {

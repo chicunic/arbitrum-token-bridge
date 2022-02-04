@@ -23,7 +23,7 @@ import "arb-bridge-eth/contracts/libraries/BytesLib.sol";
 import "arb-bridge-eth/contracts/libraries/ProxyUtil.sol";
 import "arb-bridge-eth/contracts/libraries/AddressAliasHelper.sol";
 
-import "arb-bridge-peripherals/contracts/tokenbridge/arbitrum/IArbToken.sol";
+import "../IArbToken.sol";
 
 import "arb-bridge-peripherals/contracts/tokenbridge/arbitrum/L2ArbitrumMessenger.sol";
 import "arb-bridge-peripherals/contracts/tokenbridge/libraries/gateway/GatewayMessageHandler.sol";
@@ -61,23 +61,11 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
     }
 
     function createOutboundTx(
-        address _from,
+        address,
         uint256, /* _tokenId */
-        bytes memory _outboundCalldata
-    ) internal virtual returns (uint256) {
-        // We make this function virtual since outboundTransfer logic is the same for many gateways
-        // but sometimes (ie weth) you construct the outgoing message differently.
-
-        // exitNum incremented after being included in _outboundCalldata
-        exitNum++;
-        return
-            sendTxToL1(
-                // default to sending no callvalue to the L1
-                0,
-                _from,
-                counterpartGateway,
-                _outboundCalldata
-            );
+        bytes memory
+    ) internal pure virtual returns (uint256) {
+        return 0;
     }
 
     function getOutboundCalldata(
@@ -116,32 +104,6 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
         uint256, /* _gasPriceBid */
         bytes calldata
     ) public payable virtual override returns (bytes memory res) {
-        // This function is set as public and virtual so that subclasses can override
-        // it and add custom validation for callers (ie only whitelisted users)
-        // the function is marked as payable to conform to the inheritance setup
-        // this particular code path shouldn't have a msg.value > 0
-        // TODO: remove this invariant for execution markets
-        // require(msg.value == 0, "NO_VALUE");
-        // address _from;
-        // bytes memory _extraData;
-        // {
-        //     if (isRouter(msg.sender)) {
-        //         (_from, _extraData) = GatewayMessageHandler.parseFromRouterToGateway(_data);
-        //     } else {
-        //         _from = msg.sender;
-        //         _extraData = _data;
-        //     }
-        // }
-        // the inboundEscrowAndCall functionality has been disabled, so no data is allowed
-        // require(_extraData.length == 0, "EXTRA_DATA_DISABLED");
-        // uint256 id;
-        // {
-        //     address l2Token = calculateL2TokenAddress(_l1Token);
-        //     require(l2Token.isContract(), "TOKEN_NOT_DEPLOYED");
-        //     require(IArbToken(l2Token).l1Address() == _l1Token, "NOT_EXPECTED_L1_TOKEN");
-        //     _tokenId = outboundEscrowTransfer(l2Token, _from, _tokenId);
-        //     id = triggerWithdrawal(_l1Token, _from, _to, _tokenId, _extraData);
-        // }
         return abi.encode(_tokenId);
     }
 
@@ -152,12 +114,6 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
         uint256 _tokenId,
         bytes memory
     ) internal returns (uint256) {
-        // exit number used for tradeable exits
-        // uint256 currExitNum = exitNum;
-        // unique id used to identify the L2 to L1 tx
-        // uint256 id = createOutboundTx(_from, _tokenId, getOutboundCalldata(_l1Token, _from, _to, _tokenId, _data));
-        // emit WithdrawalInitiated(_l1Token, _from, _to, id, currExitNum, _tokenId);
-        // return id;
         return _tokenId;
     }
 
@@ -166,22 +122,17 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
         address,
         uint256 _tokenId
     ) internal virtual returns (uint256 tokenIdBurnt) {
-        // this method is virtual since different subclasses can handle escrow differently
-        // user funds are escrowed on the gateway using this function
-        // burns L2 tokens in order to release escrowed L1 tokens
-        // IArbToken(_l2Token).bridgeBurn(_from, _tokenId);
-        // by default we assume that the tokenId we send to bridgeBurn is the tokenId burnt
-        // this might not be the case for every token
         return _tokenId;
     }
 
     function inboundEscrowTransfer(
         address _l2Address,
         address _dest,
-        uint256 _tokenId
+        uint256 _tokenId,
+        bytes memory _data
     ) internal virtual {
         // this method is virtual since different subclasses can handle escrow differently
-        IArbToken(_l2Address).bridgeMint(_dest, _tokenId);
+        IArbToken(_l2Address).bridgeMint(_dest, _tokenId, _data);
     }
 
     /**
@@ -202,47 +153,11 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
         uint256 _tokenId,
         bytes calldata _data
     ) external payable override onlyCounterpartGateway {
-        (bytes memory gatewayData, bytes memory callHookData) = GatewayMessageHandler.parseFromL1GatewayMsg(_data);
-
-        if (callHookData.length != 0) {
-            // callHookData should always be 0 since inboundEscrowAndCall is disabled
-            callHookData = bytes("");
-        }
+        (, bytes memory callHookData) = GatewayMessageHandler.parseFromL1GatewayMsg(_data);
 
         address expectedAddress = calculateL2TokenAddress(_token);
 
-        if (!expectedAddress.isContract()) {
-            bool shouldHalt = handleNoContract(_token, expectedAddress, _from, _to, _tokenId, gatewayData);
-            if (shouldHalt) return;
-        }
-        // ignores gatewayData if token already deployed
-
-        {
-            // validate if L1 address supplied matches that of the expected L2 address
-            (bool success, bytes memory _l1AddressData) = expectedAddress.staticcall(abi.encodeWithSelector(IArbToken.l1Address.selector));
-
-            bool shouldWithdraw;
-            if (!success || _l1AddressData.length < 32) {
-                shouldWithdraw = true;
-            } else {
-                // we do this in the else branch since we want to avoid reverts
-                // and `toAddress` reverts if _l1AddressData has a short length
-                // `_l1AddressData` should be 12 bytes of padding then 20 bytes for the address
-                address expectedL1Address = BytesLib.toAddress(_l1AddressData, 12);
-                if (expectedL1Address != _token) {
-                    shouldWithdraw = true;
-                }
-            }
-
-            if (shouldWithdraw) {
-                // we don't need the return value from triggerWithdrawal since this is forcing
-                // a withdrawal back to the L1 instead of composing with a L2 dapp
-                triggerWithdrawal(_token, address(this), _from, _tokenId, "");
-                return;
-            }
-        }
-
-        inboundEscrowTransfer(expectedAddress, _to, _tokenId);
+        inboundEscrowTransfer(expectedAddress, _to, _tokenId, callHookData);
         emit DepositFinalized(_token, _from, _to, _tokenId);
 
         return;

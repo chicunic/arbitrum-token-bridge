@@ -28,13 +28,13 @@ module.exports = {
       url: process.env.L2_RPC || '',
       accounts: process.env.L2_PRIVKEY ? [process.env.L2_PRIVKEY] : [],
     },
-    // hardhat: {
-    //   chainId: 4,
-    //   forking: {
-    //     url: process.env.L1_RPC || '',
-    //     accounts: [{ privateKey: process.env.L1_PRIVKEY, balance: '1000000000000000000' }],
-    //   },
-    // },
+    hardhat: {
+      chainId: 4,
+      forking: {
+        url: process.env.L1_RPC || '',
+        accounts: [{ privateKey: process.env.L1_PRIVKEY, balance: '1000000000000000000' }],
+      },
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,

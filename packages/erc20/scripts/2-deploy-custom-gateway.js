@@ -18,7 +18,7 @@ async function main() {
   const inboxAddress = (await bridge.l1Bridge.getInbox()).address;
 
   console.log('2 - Deploy CustomGateway');
-  // 1. deploy ERC20 Gateway
+  // 1. deploy L1 ERC20 Gateway
   const L1CustomGateway = (await ethers.getContractFactory('L1CustomGateway')).connect(l1Signer);
   const l1CustomGatewayLogic = await L1CustomGateway.deploy();
   await l1CustomGatewayLogic.deployed();
@@ -31,6 +31,7 @@ async function main() {
   await l1CustomGatewayProxy.deployed();
   console.log('1-2: L1 CustomGateway Proxy deployed at', l1CustomGatewayProxy.address);
 
+  // 2. deploy L2 ERC20 Gateway
   const L2CustomGateway = (await ethers.getContractFactory('L2CustomGateway')).connect(l2Signer);
   const l2CustomGatewayLogic = await L2CustomGateway.deploy();
   await l2CustomGatewayLogic.deployed();
@@ -43,7 +44,7 @@ async function main() {
   await l2CustomGatewayProxy.deployed();
   console.log('2-2: L2 CustomGateway Proxy deployed at', l2CustomGatewayProxy.address);
 
-  // 4. init
+  // 3. init gateway
   const l1CustomGateway = L1CustomGateway.attach(l1CustomGatewayProxy.address);
   const initL1Bridge = await l1CustomGateway.initialize(
     l2CustomGatewayProxy.address,
@@ -52,7 +53,7 @@ async function main() {
     l1SignerAddress,
   );
   await initL1Bridge.wait();
-  console.log('4-1: init L1 CustomGateway hash', initL1Bridge.hash);
+  console.log('3-1: init L1 CustomGateway hash', initL1Bridge.hash);
 
   const l2CustomGateway = L2CustomGateway.attach(l2CustomGatewayProxy.address);
   const initL2Bridge = await l2CustomGateway.initialize(
@@ -60,7 +61,7 @@ async function main() {
     l1Network.tokenBridge.l2GatewayRouter,
   );
   await initL2Bridge.wait();
-  console.log('4-2: init L2 CustomGateway hash', initL2Bridge.hash);
+  console.log('3-2: init L2 CustomGateway hash', initL2Bridge.hash);
 
   console.log('Done.');
 }

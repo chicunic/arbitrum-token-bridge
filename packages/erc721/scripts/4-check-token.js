@@ -16,7 +16,7 @@ async function main() {
   const token1 = process.env.L1_ERC721;
   const token2 = process.env.L2_ERC721;
 
-  // 2. check ERC721Gateway
+  // 1. check ERC721Gateway
   const l1ERC721Gateway = await ethers.getContractAt('L1ERC721Gateway', l1Network.tokenBridge.l1CustomGateway, l1Signer);
   const l2ERC721Gateway = await ethers.getContractAt('L2ERC721Gateway', l1Network.tokenBridge.l2CustomGateway, l2Signer);
 
@@ -32,7 +32,7 @@ async function main() {
     console.log('Calculate L2', l2TokenAddress);
   }
 
-  // 3. check GatwayRouter
+  // 2. check GatwayRouter
   const l1GatewayRouter = await ethers.getContractAt('L1GatewayRouter', l1Network.tokenBridge.l1GatewayRouter, l1Signer);
   const l2GatewayRouter = await ethers.getContractAt('L2GatewayRouter', l1Network.tokenBridge.l2GatewayRouter, l2Signer);
   {

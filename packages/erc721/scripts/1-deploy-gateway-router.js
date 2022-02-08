@@ -18,7 +18,7 @@ async function main() {
   const inboxAddress = (await bridge.l1Bridge.getInbox()).address;
 
   console.log('1 - Deploy GatewayRouter');
-  // deploy L1 contracts
+  // 1. deploy L1 contracts
   const L1GatewayRouter = (await ethers.getContractFactory('L1GatewayRouter')).connect(l1Signer);
   const l1GatewayRouterLogic = await L1GatewayRouter.deploy();
   await l1GatewayRouterLogic.deployed();
@@ -36,7 +36,7 @@ async function main() {
   await l1GatewayRouterProxy.deployed();
   console.log('1-3: L1 GatewayRouter Proxy deployed at', l1GatewayRouterProxy.address);
 
-  // deploy L2 contracts
+  // 2. deploy L2 contracts
   const L2GatewayRouter = (await ethers.getContractFactory('L2GatewayRouter')).connect(l2Signer);
   const l2GatewayRouterLogic = await L2GatewayRouter.deploy();
   await l2GatewayRouterLogic.deployed();
@@ -54,7 +54,7 @@ async function main() {
   await l2GatewayRouterProxy.deployed();
   console.log('2-3: L2 GatewayRouter Proxy deployed at', l2GatewayRouterProxy.address);
 
-  // init L1 gateway
+  // 3. init gateway
   const l1GatewayRouter = L1GatewayRouter.attach(l1GatewayRouterProxy.address);
   const initL1RouterTx = await l1GatewayRouter.initialize(
     l1SignerAddress,
@@ -66,7 +66,6 @@ async function main() {
   await initL1RouterTx.wait();
   console.log('3-1: init L1 GatewayRouter hash', initL1RouterTx.hash);
 
-  // init L2 gateway
   const l2GatewayRouter = L2GatewayRouter.attach(l2GatewayRouterProxy.address);
   const initL2Router = await l2GatewayRouter.initialize(
     l1GatewayRouterProxy.address,

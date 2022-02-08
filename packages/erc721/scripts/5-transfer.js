@@ -10,6 +10,8 @@ const l2Provider = new providers.JsonRpcProvider(process.env.L2_RPC);
 const l1Signer = new Wallet(process.env.L1_PRIVKEY, l1Provider);
 const l2Signer = new Wallet(process.env.L2_PRIVKEY, l2Provider);
 
+const tokenId = 1;
+
 async function main() {
   const { l1Network, l2Network } = await getNetworks(l1Signer, l2Signer);
   const bridge = await Bridge.init(l1Signer, l2Signer, { isCustomNetwork: { l1Network, l2Network } });
@@ -18,7 +20,6 @@ async function main() {
 
   console.log('5 - Transfer ERC721 from L1 to L2');
   const l1Token = await ethers.getContractAt('L1Token', process.env.L1_ERC721, l1Signer);
-  const tokenId = '1';
   const mintTx = await l1Token.mint(l1SignerAddress, tokenId);
   await mintTx.wait();
   console.log('1-1: mint');

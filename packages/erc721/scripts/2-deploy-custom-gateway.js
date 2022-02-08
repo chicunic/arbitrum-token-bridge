@@ -18,7 +18,7 @@ async function main() {
   const inboxAddress = (await bridge.l1Bridge.getInbox()).address;
 
   console.log('2 - Deploy ERC721Gateway');
-  // 1. deploy ERC721 Gateway
+  // 1. deploy L1 ERC721 Gateway
   const L1ERC721Gateway = (await ethers.getContractFactory('L1ERC721Gateway')).connect(l1Signer);
   const l1ERC721GatewayLogic = await L1ERC721Gateway.deploy();
   await l1ERC721GatewayLogic.deployed();
@@ -31,6 +31,7 @@ async function main() {
   await l1ERC721GatewayProxy.deployed();
   console.log('1-2: L1 ERC721Gateway Proxy deployed at', l1ERC721GatewayProxy.address);
 
+  // 1. deploy L2 ERC721 Gateway
   const L2ERC721Gateway = (await ethers.getContractFactory('L2ERC721Gateway')).connect(l2Signer);
   const l2ERC721GatewayLogic = await L2ERC721Gateway.deploy();
   await l2ERC721GatewayLogic.deployed();
@@ -43,7 +44,7 @@ async function main() {
   await l2ERC721GatewayProxy.deployed();
   console.log('2-2: L2 ERC721Gateway Proxy deployed at', l2ERC721GatewayProxy.address);
 
-  // 4. init
+  // 3. init ERC721 Gateway
   const l1ERC721Gateway = L1ERC721Gateway.attach(l1ERC721GatewayProxy.address);
   const initL1Bridge = await l1ERC721Gateway.initialize(
     l2ERC721GatewayProxy.address,
@@ -52,7 +53,7 @@ async function main() {
     l1SignerAddress,
   );
   await initL1Bridge.wait();
-  console.log('4-1: init L1 ERC721Gateway hash', initL1Bridge.hash);
+  console.log('3-1: init L1 ERC721Gateway hash', initL1Bridge.hash);
 
   const l2CustomGateway = L2ERC721Gateway.attach(l2ERC721GatewayProxy.address);
   const initL2Bridge = await l2CustomGateway.initialize(
@@ -60,7 +61,7 @@ async function main() {
     l1Network.tokenBridge.l2GatewayRouter,
   );
   await initL2Bridge.wait();
-  console.log('4-2: init L2 ERC721Gateway hash', initL2Bridge.hash);
+  console.log('3-2: init L2 ERC721Gateway hash', initL2Bridge.hash);
 
   console.log('Done.');
 }

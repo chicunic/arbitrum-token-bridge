@@ -61,7 +61,7 @@ async function main() {
   await setGatewayTx.wait();
   console.log('2-2: Set L1 GatewayRouter hash', setGatewayTx.hash);
 
-  console.log('Done');
+  console.log('Done.');
 }
 
 // We recommend this pattern to be able to use async/await everywhere

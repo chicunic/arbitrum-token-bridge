@@ -13,7 +13,6 @@ async function main() {
   const { l1Network } = await getNetworks(l1Signer, l2Signer);
 
   console.log('3 - Deploy and register ERC721');
-  // const tokenId = '1';
 
   // 1. deploy ERC721
   const L1Token = await ethers.getContractFactory('L1Token');
@@ -61,7 +60,7 @@ async function main() {
   await setGatewayTx.wait();
   console.log('2-2: Set L1 GatewayRouter hash', setGatewayTx.hash);
 
-  console.log('Done');
+  console.log('Done.');
 }
 
 // We recommend this pattern to be able to use async/await everywhere

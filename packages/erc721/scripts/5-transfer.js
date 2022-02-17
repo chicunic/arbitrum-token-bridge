@@ -10,7 +10,8 @@ const l2Provider = new providers.JsonRpcProvider(process.env.L2_RPC);
 const l1Signer = new Wallet(process.env.L1_PRIVKEY, l1Provider);
 const l2Signer = new Wallet(process.env.L2_PRIVKEY, l2Provider);
 
-const tokenId = 1;
+const tokenIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const amount = tokenIds.length;
 
 async function main() {
   const { l1Network, l2Network } = await getNetworks(l1Signer, l2Signer);
@@ -20,15 +21,15 @@ async function main() {
 
   console.log('5 - Transfer ERC721 from L1 to L2');
   const l1Token = await ethers.getContractAt('L1Token', process.env.L1_ERC721, l1Signer);
-  const mintTx = await l1Token.mint(l1SignerAddress, tokenId);
+  const mintTx = await l1Token['mint(address,uint256[])'](l1SignerAddress, tokenIds);
   await mintTx.wait();
   console.log('1-1: mint');
 
-  const approveTx = await bridge.approveToken(process.env.L1_ERC721, tokenId);
+  const approveTx = await bridge.approveTokenForAll(process.env.L1_ERC721);
   await approveTx.wait();
   console.log('1-2: approved');
 
-  const depositTx = await bridge.deposit({ l1TokenAddress: process.env.L1_ERC721, tokenId });
+  const depositTx = await bridge.deposit({ l1TokenAddress: process.env.L1_ERC721, amount, tokenIds });
   const depositRec = await depositTx.wait();
   const seqNumArr = await bridge.getInboxSeqNumFromContractTransaction(depositRec);
   const seqNum = seqNumArr[0];

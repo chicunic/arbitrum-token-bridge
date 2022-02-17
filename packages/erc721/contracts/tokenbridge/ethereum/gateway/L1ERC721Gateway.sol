@@ -59,24 +59,21 @@ contract L1ERC721Gateway is L1ArbitrumExtendedGateway, ICustomGateway {
     function outboundTransfer(
         address _l1Token,
         address _to,
-        uint256 _tokenId,
+        uint256 _amount,
         uint256 _maxGas,
         uint256 _gasPriceBid,
         bytes calldata _data
     ) public payable override nonReentrant returns (bytes memory res) {
-        return super.outboundTransfer(_l1Token, _to, _tokenId, _maxGas, _gasPriceBid, _data);
+        return super.outboundTransfer(_l1Token, _to, _amount, _maxGas, _gasPriceBid, _data);
     }
 
     function finalizeInboundTransfer(
         address _token,
         address _from,
         address _to,
-        uint256 _tokenId,
+        uint256 _amount,
         bytes calldata _data
-    ) public payable virtual override nonReentrant {
-        // the superclass checks onlyCounterpartGateway
-        // super.finalizeInboundTransfer(_token, _from, _to, _tokenId, _data);
-    }
+    ) public payable virtual override nonReentrant {}
 
     function initialize(
         address _l1Counterpart,
@@ -93,11 +90,11 @@ contract L1ERC721Gateway is L1ArbitrumExtendedGateway, ICustomGateway {
     }
 
     /**
-     * @notice Calculate the address used when bridging an ERC20 token
+     * @notice Calculate the address used when bridging an ERC721 token
      * @dev the L1 and L2 address oracles may not always be in sync.
      * For example, a custom token may have been registered but not deploy or the contract self destructed.
      * @param l1Token address of L1 token
-     * @return L2 address of a bridged ERC20 token
+     * @return L2 address of a bridged ERC721 token
      */
     function calculateL2TokenAddress(address l1Token) public view override returns (address) {
         return l1ToL2Token[l1Token];

@@ -3,9 +3,7 @@ const {
   L1Bridge,
   L2Bridge,
 } = require('arb-ts');
-const {
-  utils,
-} = require('ethers');
+const { utils } = require('ethers');
 const { ethers } = require('hardhat');
 const networks = require('./networks');
 

@@ -1,7 +1,5 @@
 const _ = require('lodash');
-const {
-  networks: defaultNetworks,
-} = require('arb-ts');
+const { networks: defaultNetworks } = require('arb-ts');
 
 const mainnetBridge = {
   // l1GatewayRouterLogic: '',

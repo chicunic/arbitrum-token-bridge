@@ -24,21 +24,13 @@ pragma solidity ^0.6.11;
 
 interface IArbToken {
     /**
-     * @notice should mint token supply by tokenId, and should (probably) only be callable by the L1 bridge.
+     * @notice should mint token supply by amount and data, and should (probably) only be callable by the L1 bridge.
      */
-
-    function bridgeMint(address account, uint256 tokenId) external;
-
     function bridgeMint(
         address account,
-        uint256 tokenId,
+        uint256 amount,
         bytes memory data
     ) external;
-
-    /**
-     * @notice should burn token supply by tokenId, and should (probably) only be callable by the L1 bridge.
-     */
-    function bridgeBurn(address account, uint256 tokenId) external;
 
     /**
      * @return address of layer 1 token

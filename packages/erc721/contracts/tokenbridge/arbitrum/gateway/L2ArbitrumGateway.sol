@@ -27,7 +27,7 @@ import "../IArbToken.sol";
 
 import "arb-bridge-peripherals/contracts/tokenbridge/arbitrum/L2ArbitrumMessenger.sol";
 import "arb-bridge-peripherals/contracts/tokenbridge/libraries/gateway/GatewayMessageHandler.sol";
-import "../../libraries/gateway/TokenGateway.sol";
+import "arb-bridge-peripherals/contracts/tokenbridge/libraries/gateway/TokenGateway.sol";
 
 /**
  * @title Common interface for gatways on Arbitrum messaging to L1.
@@ -37,9 +37,9 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
 
     uint256 public exitNum;
 
-    event DepositFinalized(address indexed l1Token, address indexed _from, address indexed _to, uint256 _tokenId);
+    event DepositFinalized(address indexed l1Token, address indexed _from, address indexed _to, uint256 _amount);
 
-    event WithdrawalInitiated(address l1Token, address indexed _from, address indexed _to, uint256 indexed _l2ToL1Id, uint256 _exitNum, uint256 _tokenId);
+    event WithdrawalInitiated(address l1Token, address indexed _from, address indexed _to, uint256 indexed _l2ToL1Id, uint256 _exitNum, uint256 _amount);
 
     modifier onlyCounterpartGateway() override {
         require(msg.sender == counterpartGateway || AddressAliasHelper.undoL1ToL2Alias(msg.sender) == counterpartGateway, "ONLY_COUNTERPART_GATEWAY");
@@ -62,7 +62,7 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
 
     function createOutboundTx(
         address,
-        uint256, /* _tokenId */
+        uint256, /* _tokenAmount */
         bytes memory
     ) internal pure virtual returns (uint256) {
         return 0;
@@ -72,7 +72,7 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
         address _token,
         address _from,
         address _to,
-        uint256 _tokenId,
+        uint256 _amount,
         bytes memory _data
     ) public view override returns (bytes memory outboundCalldata) {
         outboundCalldata = abi.encodeWithSelector(
@@ -80,7 +80,7 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
             _token,
             _from,
             _to,
-            _tokenId,
+            _amount,
             GatewayMessageHandler.encodeFromL2GatewayMsg(exitNum, _data)
         );
 
@@ -90,49 +90,49 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
     function outboundTransfer(
         address _l1Token,
         address _to,
-        uint256 _tokenId,
+        uint256 _amount,
         bytes calldata _data
     ) public payable virtual returns (bytes memory) {
-        return outboundTransfer(_l1Token, _to, _tokenId, 0, 0, _data);
+        return outboundTransfer(_l1Token, _to, _amount, 0, 0, _data);
     }
 
     function outboundTransfer(
         address,
         address,
-        uint256 _tokenId,
+        uint256,
         uint256, /* _maxGas */
         uint256, /* _gasPriceBid */
         bytes calldata
     ) public payable virtual override returns (bytes memory res) {
-        return abi.encode(_tokenId);
+        return abi.encode(0);
     }
 
     function triggerWithdrawal(
         address,
         address,
         address,
-        uint256 _tokenId,
+        uint256,
         bytes memory
-    ) internal returns (uint256) {
-        return _tokenId;
+    ) internal pure returns (uint256) {
+        return 0;
     }
 
     function outboundEscrowTransfer(
         address,
         address,
-        uint256 _tokenId
-    ) internal virtual returns (uint256 tokenIdBurnt) {
-        return _tokenId;
+        uint256
+    ) internal pure virtual returns (uint256 amountBurnt) {
+        return 0;
     }
 
     function inboundEscrowTransfer(
         address _l2Address,
         address _dest,
-        uint256 _tokenId,
+        uint256 _amount,
         bytes memory _data
     ) internal virtual {
         // this method is virtual since different subclasses can handle escrow differently
-        IArbToken(_l2Address).bridgeMint(_dest, _tokenId, _data);
+        IArbToken(_l2Address).bridgeMint(_dest, _amount, _data);
     }
 
     /**
@@ -143,22 +143,22 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
      * @param _token L1 address of ERC20
      * @param _from account that initiated the deposit in the L1
      * @param _to account to be credited with the tokens in the L2 (can be the user's L2 account or a contract)
-     * @param _tokenId token id to be minted to the user
+     * @param _amount token amount to be minted to the user
      * @param _data encoded symbol/name/decimal data for deploy, in addition to any additional callhook data
      */
     function finalizeInboundTransfer(
         address _token,
         address _from,
         address _to,
-        uint256 _tokenId,
+        uint256 _amount,
         bytes calldata _data
     ) external payable override onlyCounterpartGateway {
         (, bytes memory callHookData) = GatewayMessageHandler.parseFromL1GatewayMsg(_data);
 
         address expectedAddress = calculateL2TokenAddress(_token);
 
-        inboundEscrowTransfer(expectedAddress, _to, _tokenId, callHookData);
-        emit DepositFinalized(_token, _from, _to, _tokenId);
+        inboundEscrowTransfer(expectedAddress, _to, _amount, callHookData);
+        emit DepositFinalized(_token, _from, _to, _amount);
 
         return;
     }
@@ -169,7 +169,7 @@ abstract contract L2ArbitrumGateway is L2ArbitrumMessenger, TokenGateway {
         address expectedL2Address,
         address _from,
         address _to,
-        uint256 _tokenId,
+        uint256 _amount,
         bytes memory gatewayData
     ) internal virtual returns (bool shouldHalt);
 }

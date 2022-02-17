@@ -29,7 +29,7 @@ import "arb-bridge-eth/contracts/libraries/ProxyUtil.sol";
 
 import "arb-bridge-peripherals/contracts/tokenbridge/ethereum/L1ArbitrumMessenger.sol";
 import "arb-bridge-peripherals/contracts/tokenbridge/libraries/gateway/GatewayMessageHandler.sol";
-import "../../libraries/gateway/TokenGateway.sol";
+import "arb-bridge-peripherals/contracts/tokenbridge/libraries/gateway/TokenGateway.sol";
 import "arb-bridge-peripherals/contracts/tokenbridge/libraries/ITransferAndCall.sol";
 
 /**
@@ -40,9 +40,9 @@ abstract contract L1ArbitrumGateway is L1ArbitrumMessenger, TokenGateway {
 
     address public inbox;
 
-    event DepositInitiated(address l1Token, address indexed _from, address indexed _to, uint256 indexed _sequenceNumber, uint256 _tokenId);
+    event DepositInitiated(address l1Token, address indexed _from, address indexed _to, uint256 indexed _sequenceNumber, uint256 _amount);
 
-    event WithdrawalFinalized(address l1Token, address indexed _from, address indexed _to, uint256 indexed _exitNum, uint256 _tokenId);
+    event WithdrawalFinalized(address l1Token, address indexed _from, address indexed _to, uint256 indexed _exitNum, uint256 _amount);
 
     modifier onlyCounterpartGateway() override {
         address _inbox = inbox;
@@ -82,14 +82,14 @@ abstract contract L1ArbitrumGateway is L1ArbitrumMessenger, TokenGateway {
      * @param _token L1 address of token being withdrawn from
      * @param _from initiator of withdrawal
      * @param _to address the L2 withdrawal call set as the destination.
-     * @param _tokenId Token id being withdrawn
+     * @param _amount Token amount being withdrawn
      * @param _data encoded exitNum (Sequentially increasing exit counter determined by the L2Gateway) and additinal hook data
      */
     function finalizeInboundTransfer(
         address _token,
         address _from,
         address _to,
-        uint256 _tokenId,
+        uint256 _amount,
         bytes calldata _data
     ) public payable virtual override onlyCounterpartGateway {}
 
@@ -107,11 +107,8 @@ abstract contract L1ArbitrumGateway is L1ArbitrumMessenger, TokenGateway {
     function inboundEscrowTransfer(
         address _l1Token,
         address _dest,
-        uint256 _tokenId
-    ) internal virtual {
-        // this method is virtual since different subclasses can handle escrow differently
-        // IERC721(_l1Token).safeTransferFrom(msg.sender, _dest, _tokenId);
-    }
+        uint256 _amount
+    ) internal virtual {}
 
     function createOutboundTx(
         address _from,
@@ -142,7 +139,7 @@ abstract contract L1ArbitrumGateway is L1ArbitrumMessenger, TokenGateway {
      * @notice Deposit ERC20 token from Ethereum into Arbitrum. If L2 side hasn't been deployed yet, includes name/symbol/decimals data for initial L2 deploy. Initiate by GatewayRouter.
      * @param _l1Token L1 address of ERC20
      * @param _to account to be credited with the tokens in the L2 (can be the user's L2 account or a contract)
-     * @param _tokenId Token Amount
+     * @param _amount Token Amount
      * @param _maxGas Max gas deducted from user's L2 balance to cover L2 execution
      * @param _gasPriceBid Gas price for L2 execution
      * @param _data encoded data from router and user
@@ -152,7 +149,7 @@ abstract contract L1ArbitrumGateway is L1ArbitrumMessenger, TokenGateway {
     function outboundTransfer(
         address _l1Token,
         address _to,
-        uint256 _tokenId,
+        uint256 _amount,
         uint256 _maxGas,
         uint256 _gasPriceBid,
         bytes calldata _data
@@ -174,41 +171,41 @@ abstract contract L1ArbitrumGateway is L1ArbitrumMessenger, TokenGateway {
             }
             // user encoded
             (_maxSubmissionCost, extraData) = abi.decode(extraData, (uint256, bytes));
-            // the inboundEscrowAndCall functionality has been disabled, so no data is allowed
-            require(extraData.length == 0, "EXTRA_DATA_DISABLED");
-
             require(_l1Token.isContract(), "L1_NOT_CONTRACT");
             address l2Token = calculateL2TokenAddress(_l1Token);
             require(l2Token != address(0), "NO_L2_TOKEN_SET");
+            uint256[] memory _tokenIds = abi.decode(extraData, (uint256[]));
+            require(_amount == _tokenIds.length, "INVALID_DATA");
 
-            _tokenId = outboundEscrowTransfer(_l1Token, _from, _tokenId);
+            _amount = outboundEscrowTransfer(_l1Token, _from, _amount, _tokenIds);
 
             // we override the res field to save on the stack
-            res = getOutboundCalldata(_l1Token, _from, _to, _tokenId, extraData);
+            res = getOutboundCalldata(_l1Token, _from, _to, _amount, extraData);
 
-            seqNum = createOutboundTx(_from, _tokenId, _maxGas, _gasPriceBid, _maxSubmissionCost, res);
+            seqNum = createOutboundTx(_from, _amount, _maxGas, _gasPriceBid, _maxSubmissionCost, res);
         }
-        emit DepositInitiated(_l1Token, _from, _to, seqNum, _tokenId);
+        emit DepositInitiated(_l1Token, _from, _to, seqNum, _amount);
         return abi.encode(seqNum);
     }
 
     function outboundEscrowTransfer(
         address _l1Token,
         address _from,
-        uint256 _tokenId
-    ) internal virtual returns (uint256 tokenIdReceived) {
-        // this method is virtual since different subclasses can handle escrow differently
-        // user funds are escrowed on the gateway using this function
-        require(ERC721(_l1Token).ownerOf(_tokenId) == _from, "NOT_TOKEN_OWNER");
-        ERC721Burnable(_l1Token).burn(_tokenId);
-        return _tokenId;
+        uint256 _amount,
+        uint256[] memory _tokenIds
+    ) internal virtual returns (uint256 amountReceived) {
+        for (uint8 i = 0; i < _amount; ++i) {
+            require(ERC721(_l1Token).ownerOf(_tokenIds[i]) == _from, "NOT_TOKEN_OWNER");
+            ERC721Burnable(_l1Token).burn(_tokenIds[i]);
+        }
+        return _amount;
     }
 
     function getOutboundCalldata(
         address _l1Token,
         address _from,
         address _to,
-        uint256 _tokenId,
+        uint256 _amount,
         bytes memory _data
     ) public view virtual override returns (bytes memory outboundCalldata) {
         // this function is public so users can query how much calldata will be sent to the L2
@@ -222,7 +219,7 @@ abstract contract L1ArbitrumGateway is L1ArbitrumMessenger, TokenGateway {
             _l1Token,
             _from,
             _to,
-            _tokenId,
+            _amount,
             GatewayMessageHandler.encodeToL2GatewayMsg(emptyBytes, _data)
         );
 

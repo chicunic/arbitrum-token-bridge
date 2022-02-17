@@ -12,4 +12,10 @@ contract L1Token is Ownable, ERC721, ERC721Burnable {
     function mint(address to, uint256 tokenId) external onlyOwner {
         _mint(to, tokenId);
     }
+
+    function mint(address to, uint256[] calldata tokenIds) external onlyOwner {
+        for (uint8 i = 0; i < tokenIds.length; ++i) {
+            _mint(to, tokenIds[i]);
+        }
+    }
 }

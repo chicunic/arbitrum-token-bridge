@@ -22,20 +22,13 @@ import "@openzeppelin/contracts-0.8/token/ERC721/ERC721.sol";
 
 interface IArbToken {
     /**
-     * @notice should increase token supply by amount, and should (probably) only be callable by the L1 bridge.
+     * @notice should mint token supply by amount and data, and should (probably) only be callable by the L1 bridge.
      */
-    function bridgeMint(address account, uint256 tokenId) external;
-
     function bridgeMint(
         address account,
-        uint256 tokenId,
+        uint256 amount,
         bytes memory data
     ) external;
-
-    /**
-     * @notice should decrease token supply by amount, and should (probably) only be callable by the L1 bridge.
-     */
-    function bridgeBurn(address account, uint256 tokenId) external;
 
     /**
      * @return address of layer 1 token
@@ -63,21 +56,14 @@ contract L2Token is ERC721, IArbToken {
         _;
     }
 
-    function bridgeMint(address account, uint256 tokenId) external override onlyL2Gateway {
-        _mint(account, tokenId);
-    }
-
     function bridgeMint(
         address account,
-        uint256 tokenId,
-        bytes memory
+        uint256 amount,
+        bytes memory data
     ) external override onlyL2Gateway {
-        _mint(account, tokenId);
-    }
-
-    function bridgeBurn(address account, uint256 tokenId) external override onlyL2Gateway {
-        _beforeTokenTransfer(account, address(0), tokenId);
-
-        _burn(tokenId);
+        uint256[] memory tokenIds = abi.decode(data, (uint256[]));
+        for (uint8 i = 0; i < amount; ++i) {
+            _mint(account, tokenIds[i]);
+        }
     }
 }

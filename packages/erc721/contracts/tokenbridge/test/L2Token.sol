@@ -27,7 +27,7 @@ interface IArbToken {
     function bridgeMint(
         address account,
         uint256 amount,
-        bytes memory data
+        bytes calldata data
     ) external;
 
     /**
@@ -59,7 +59,7 @@ contract L2Token is ERC721, IArbToken {
     function bridgeMint(
         address account,
         uint256 amount,
-        bytes memory data
+        bytes calldata data
     ) external override onlyL2Gateway {
         uint256[] memory tokenIds = abi.decode(data, (uint256[]));
         for (uint8 i = 0; i < amount; ++i) {

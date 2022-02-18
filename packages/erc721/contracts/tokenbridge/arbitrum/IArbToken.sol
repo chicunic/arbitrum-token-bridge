@@ -29,7 +29,7 @@ interface IArbToken {
     function bridgeMint(
         address account,
         uint256 amount,
-        bytes memory data
+        bytes calldata data
     ) external;
 
     /**

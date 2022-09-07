@@ -8,6 +8,7 @@ parserOptions:
   ecmaVersion: latest
 rules:
   camelcase: 0
+  import/no-extraneous-dependencies: 0
   max-classes-per-file: 0
   max-len: [2, { code: 160, ignoreComments: true, ignoreTemplateLiterals: true, ignoreUrls: true }]
   no-console: 0

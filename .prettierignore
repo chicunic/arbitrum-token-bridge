@@ -1,5 +1,8 @@
-node_modules
+node_modules/*
+
+# Ignore artifacts:
 artifacts
 cache
-coverage*
-gasReporterOutput.json
+
+# Ignore all HTML files:
+*.html

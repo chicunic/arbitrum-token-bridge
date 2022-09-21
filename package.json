@@ -1,43 +1,55 @@
 {
   "name": "arbitrum-token-bridge",
-  "version": "0.0.1",
-  "description": "arbitrum token bridge for ERC20 & ERC721",
-  "license": "MIT",
-  "private": true,
-  "repository": "git@github.com:cy92830/arbitrum-token-bridge.git",
-  "engines": {
-    "node": ">=16"
-  },
+  "version": "1.0.0",
+  "description": "Contracts of canonical token bridge implementation for ERC20 & ERC721",
+  "main": "index.js",
+  "repository": "git@github.com:chicunic/arbitrum-token-bridge.git",
+  "author": "chicunic <xiaoyu8301@gmail.com>",
+  "license": "Apache-2.0",
   "scripts": {
-    "start": "node app.js",
-    "lint": "eslint ./"
+    "build": "ypx hardhat compile",
+    "test": "ypx hardhat test",
+    "deploy": "ypx hardhat run",
+    "deploy:mainnet": "ypx hardhat run --network mainnet",
+    "deploy:arbitrum": "ypx hardhat run --network arbitrumOne",
+    "deploy:goerli": "ypx hardhat run --network goerli",
+    "deploy:arbitrumGoerli": "ypx hardhat run --network arbitrumGoerli",
+    "lint": "eslint ."
   },
-  "workspaces": [
-    "packages/erc20",
-    "packages/erc721"
-  ],
-  "pre-commit": [
-    "lint"
-  ],
   "devDependencies": {
+    "@arbitrum/sdk": "3.0.0-beta.12",
+    "@ethersproject/abi": "^5.7.0",
+    "@ethersproject/providers": "^5.7.1",
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.6",
+    "@nomicfoundation/hardhat-toolbox": "^2.0.0",
+    "@nomiclabs/hardhat-ethers": "^2.1.1",
     "@nomiclabs/hardhat-etherscan": "^3.1.0",
-    "@nomiclabs/hardhat-waffle": "^2.0.3",
-    "@openzeppelin/contracts-0.8": "npm:@openzeppelin/contracts",
-    "@openzeppelin/contracts-upgradeable-0.8": "npm:@openzeppelin/contracts-upgradeable",
-    "arb-bridge-peripherals": "^1.0.11",
-    "arb-ts": "^1.0.2",
+    "@openzeppelin/contracts": "^4.7.3",
+    "@typechain/ethers-v5": "^10.1.0",
+    "@typechain/hardhat": "^6.1.3",
+    "@types/lodash": "^4.14.185",
+    "@typescript-eslint/eslint-plugin": "^5.38.0",
+    "arbos-precompiles": "^1.0.2",
     "chai": "^4.3.6",
     "dotenv": "^16.0.2",
-    "eslint": "^8.23.0",
-    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint": "^8.23.1",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-config-standard-with-typescript": "^23.0.0",
     "eslint-plugin-import": "^2.26.0",
-    "ethers": "^5.7.0",
-    "hardhat": "^2.11.1",
+    "eslint-plugin-n": "^15.2.5",
+    "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-promise": "^6.0.1",
+    "ethers": "^5.7.1",
+    "hardhat": "^2.11.2",
     "hardhat-gas-reporter": "^1.0.9",
-    "pre-commit": "^1.2.2",
     "prettier": "^2.7.1",
     "prettier-plugin-solidity": "^1.0.0-beta.24",
     "solhint": "^3.3.7",
-    "solidity-coverage": "^0.8.1"
+    "solidity-coverage": "^0.8.2",
+    "ts-loader": "^9.4.1",
+    "ts-node": "^10.9.1",
+    "typechain": "^8.1.0",
+    "typescript": "^4.8.3"
   }
 }

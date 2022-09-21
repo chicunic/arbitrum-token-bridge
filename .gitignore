@@ -1,12 +1,12 @@
-.DS_Store
+# Hardhat files
+scripts/*.json
+node_modules
+.env
 coverage.json
 typechain
-
-#Hardhat files
+typechain-types
 cache
 artifacts
-
-#Node
 package-lock.json
 yarn.lock
 

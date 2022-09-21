@@ -1,19 +1,15 @@
 # arbitrum-token-bridge
 
-arbitrum token bridge for ERC20 &amp; ERC721
+Contracts of canonical token bridge implementation for ERC20 & ERC721
 
-## install
+This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
 
-```bash
-yarn
-```
+Try running some of the following tasks:
 
-## deploy
-
-```bash
-cd packages/erc20
-yarn build
-yarn deploy:1
-yarn deploy:2
-yarn deploy:3
+```shell
+npx hardhat help
+npx hardhat test
+GAS_REPORT=true npx hardhat test
+npx hardhat node
+npx hardhat run scripts/deploy.ts
 ```

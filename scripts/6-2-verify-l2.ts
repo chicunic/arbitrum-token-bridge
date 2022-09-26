@@ -45,7 +45,7 @@ async function main(): Promise<void> {
         contract,
         constructorArguments,
       });
-      console.log(`7-2: L2 ${name} verified at ${contract}`);
+      console.log(`6-2: L2 ${name} verified at ${address as string}`);
     } catch (e: any) {
       console.error(name, e.message);
     }

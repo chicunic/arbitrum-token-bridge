@@ -45,7 +45,7 @@ async function main(): Promise<void> {
         contract,
         constructorArguments,
       });
-      console.log(`7-1: L1 ${name} verified at deployed.get('l1ProxyAdmin`);
+      console.log(`6-1: L1 ${name} verified at ${address as string}`);
     } catch (e: any) {
       console.error(name, e.message);
     }

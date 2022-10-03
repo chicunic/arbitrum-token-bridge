@@ -2,10 +2,10 @@ import * as dotenv from 'dotenv';
 import * as _ from 'lodash';
 import { getL2Network } from '@arbitrum/sdk';
 import { AdminErc20Bridger } from '@arbitrum/sdk/dist/lib/assetBridger/erc20Bridger';
-import { ethers } from 'hardhat';
 import { JsonStorage } from './utils/jsonStorage';
-import { L1ERC20TokenFactory, L2ERC20TokenFactory } from './utils/contractFactories';
 import { parseWallets } from './utils/parseWallets';
+import { L1Token__factory } from '../typechain-types/factories/contracts/token/ERC20/L1Token.sol/L1Token__factory';
+import { L2Token__factory } from '../typechain-types/factories/contracts/token/ERC20/L2Token__factory';
 dotenv.config();
 
 async function main(): Promise<void> {
@@ -33,8 +33,8 @@ async function main(): Promise<void> {
 
   // deploy L1 contracts
   if (deployed.get('l1ERC20Token') == null) {
-    const L1ERC20Token = (await ethers.getContractFactory(L1ERC20TokenFactory)).connect(l1Wallet);
-    const l1token = await L1ERC20Token.deploy(deployed.get('l1CustomGateway'), l2Network.tokenBridge.l1GatewayRouter);
+    const L1Token = new L1Token__factory(l1Wallet);
+    const l1token = await L1Token.deploy(deployed.get('l1CustomGateway'), l2Network.tokenBridge.l1GatewayRouter);
     await l1token.deployed();
     deployed.set('l1ERC20Token', l1token.address);
     console.log('2-1: L1 ERC20 deployed to:', l1token.address);
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
 
   // deploy L2 contracts
   if (deployed.get('l2ERC20Token') == null) {
-    const L2ERC20Token = (await ethers.getContractFactory(L2ERC20TokenFactory)).connect(l2Wallet);
+    const L2ERC20Token = new L2Token__factory(l2Wallet);
     const l2token = await L2ERC20Token.deploy(deployed.get('l2CustomGateway'), deployed.get('l1ERC20Token'));
     await l2token.deployed();
     deployed.set('l2ERC20Token', l2token.address);

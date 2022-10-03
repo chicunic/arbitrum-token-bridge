@@ -2,10 +2,10 @@ import * as dotenv from 'dotenv';
 import * as _ from 'lodash';
 import { getL2Network } from '@arbitrum/sdk';
 import { AdminErc721Bridger } from '../src/assetBridger/erc721Bridger';
-import { ethers } from 'hardhat';
 import { JsonStorage } from './utils/jsonStorage';
-import { L1ERC721TokenFactory, L2ERC721TokenFactory } from './utils/contractFactories';
 import { parseWallets } from './utils/parseWallets';
+import { L1Token__factory } from '../typechain-types/factories/contracts/token/ERC721/L1Token.sol/L1Token__factory';
+import { L2Token__factory } from '../typechain-types/factories/contracts/token/ERC721/L2Token__factory';
 dotenv.config();
 
 async function main(): Promise<void> {
@@ -32,8 +32,8 @@ async function main(): Promise<void> {
 
   // deploy L1 contracts
   if (deployed.get('l1ERC721Token') == null) {
-    const L1ERC721Token = (await ethers.getContractFactory(L1ERC721TokenFactory)).connect(l1Wallet);
-    const l1token = await L1ERC721Token.deploy(deployed.get('l1CustomGateway'), l2Network.tokenBridge.l1GatewayRouter);
+    const L1Token = new L1Token__factory(l1Wallet);
+    const l1token = await L1Token.deploy(deployed.get('l1CustomGateway'), l2Network.tokenBridge.l1GatewayRouter);
     await l1token.deployed();
     deployed.set('l1ERC721Token', l1token.address);
     console.log('2-1: L1 ERC721 deployed to:', l1token.address);
@@ -43,8 +43,8 @@ async function main(): Promise<void> {
 
   // deploy L2 contracts
   if (deployed.get('l2ERC721Token') == null) {
-    const L2ERC721Token = (await ethers.getContractFactory(L2ERC721TokenFactory)).connect(l2Wallet);
-    const l2token = await L2ERC721Token.deploy(deployed.get('l2CustomGateway'), deployed.get('l1ERC721Token'));
+    const L2Token = new L2Token__factory(l2Wallet);
+    const l2token = await L2Token.deploy(deployed.get('l2CustomGateway'), deployed.get('l1ERC721Token'));
     await l2token.deployed();
     deployed.set('l2ERC721Token', l2token.address);
     console.log('2-2: L2 ERC721 deployed to:', l2token.address);

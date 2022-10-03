@@ -1,14 +1,13 @@
 import * as dotenv from 'dotenv';
 import { getL2Network } from '@arbitrum/sdk';
-import { ethers } from 'hardhat';
 import { JsonStorage } from './utils/jsonStorage';
-import {
-  TransparentUpgradeableProxyFactory,
-  L1CustomGatewayFactory,
-  L2CustomGatewayFactory,
-  ProxyAdminFactory,
-} from './utils/contractFactories';
 import { parseWallets } from './utils/parseWallets';
+import {
+  L1CustomGateway__factory,
+  L2CustomGateway__factory,
+  ProxyAdmin__factory,
+  TransparentUpgradeableProxy__factory,
+} from '../typechain-types';
 dotenv.config();
 
 async function main(): Promise<void> {
@@ -17,7 +16,7 @@ async function main(): Promise<void> {
 
   // deploy L1 contracts
   if (deployed.get('l1ProxyAdmin') == null) {
-    const L1ProxyAdmin = (await ethers.getContractFactory(ProxyAdminFactory)).connect(l1Wallet);
+    const L1ProxyAdmin = new ProxyAdmin__factory(l1Wallet);
     const l1ProxyAdmin = await L1ProxyAdmin.deploy();
     await l1ProxyAdmin.deployed();
     deployed.set('l1ProxyAdmin', l1ProxyAdmin.address);
@@ -27,7 +26,7 @@ async function main(): Promise<void> {
   }
 
   if (deployed.get('l1CustomGatewayLogic') == null) {
-    const L1CustomGateway = (await ethers.getContractFactory(L1CustomGatewayFactory)).connect(l1Wallet);
+    const L1CustomGateway = new L1CustomGateway__factory(l1Wallet);
     const l1CustomGatewayLogic = await L1CustomGateway.deploy();
     await l1CustomGatewayLogic.deployed();
     deployed.set('l1CustomGatewayLogic', l1CustomGatewayLogic.address);
@@ -37,9 +36,7 @@ async function main(): Promise<void> {
   }
 
   if (deployed.get('l1CustomGateway') == null) {
-    const L1TransparentUpgradeableProxy = (await ethers.getContractFactory(TransparentUpgradeableProxyFactory)).connect(
-      l1Wallet
-    );
+    const L1TransparentUpgradeableProxy = new TransparentUpgradeableProxy__factory(l1Wallet);
     const l1CustomGatewayProxy = await L1TransparentUpgradeableProxy.deploy(
       deployed.get('l1CustomGatewayLogic'),
       deployed.get('l1ProxyAdmin'),
@@ -54,7 +51,7 @@ async function main(): Promise<void> {
 
   // deploy L2 contracts
   if (deployed.get('l2ProxyAdmin') == null) {
-    const L2ProxyAdmin = (await ethers.getContractFactory(ProxyAdminFactory)).connect(l2Wallet);
+    const L2ProxyAdmin = new ProxyAdmin__factory(l2Wallet);
     const l2ProxyAdmin = await L2ProxyAdmin.deploy();
     await l2ProxyAdmin.deployed();
     deployed.set('l2ProxyAdmin', l2ProxyAdmin.address);
@@ -64,7 +61,7 @@ async function main(): Promise<void> {
   }
 
   if (deployed.get('l2CustomGatewayLogic') == null) {
-    const L2CustomGateway = (await ethers.getContractFactory(L2CustomGatewayFactory)).connect(l2Wallet);
+    const L2CustomGateway = new L2CustomGateway__factory(l2Wallet);
     const l2CustomGatewayLogic = await L2CustomGateway.deploy();
     await l2CustomGatewayLogic.deployed();
     deployed.set('l2CustomGatewayLogic', l2CustomGatewayLogic.address);
@@ -74,9 +71,7 @@ async function main(): Promise<void> {
   }
 
   if (deployed.get('l2CustomGateway') == null) {
-    const L2TransparentUpgradeableProxy = (await ethers.getContractFactory(TransparentUpgradeableProxyFactory)).connect(
-      l2Wallet
-    );
+    const L2TransparentUpgradeableProxy = new TransparentUpgradeableProxy__factory(l2Wallet);
     const l2CustomGatewayProxy = await L2TransparentUpgradeableProxy.deploy(
       deployed.get('l2CustomGatewayLogic'),
       deployed.get('l2ProxyAdmin'),
@@ -93,9 +88,7 @@ async function main(): Promise<void> {
   const defaultL2Network = await getL2Network(l2Provider);
 
   if (deployed.get('l1CustomGatewayInitialized') == null) {
-    const l1CustomGateway = (await ethers.getContractFactory(L1CustomGatewayFactory))
-      .attach(deployed.get('l1CustomGateway'))
-      .connect(l1Wallet);
+    const l1CustomGateway = L1CustomGateway__factory.connect(deployed.get('l1CustomGateway'), l1Wallet);
     const initL1Bridge = await l1CustomGateway.initialize(
       deployed.get('l2CustomGateway'),
       defaultL2Network.tokenBridge.l1GatewayRouter,
@@ -111,9 +104,7 @@ async function main(): Promise<void> {
 
   // init L2 gateway
   if (deployed.get('l2CustomGatewayInitialized') == null) {
-    const l2CustomGateway = (await ethers.getContractFactory(L2CustomGatewayFactory))
-      .attach(deployed.get('l2CustomGateway'))
-      .connect(l2Wallet);
+    const l2CustomGateway = L2CustomGateway__factory.connect(deployed.get('l2CustomGateway'), l2Wallet);
     const initL2Bridge = await l2CustomGateway.initialize(
       deployed.get('l1CustomGateway'),
       defaultL2Network.tokenBridge.l2GatewayRouter

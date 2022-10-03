@@ -2,10 +2,9 @@ import * as dotenv from 'dotenv';
 import { getL2Network } from '@arbitrum/sdk';
 import { L1GatewayRouter__factory } from '@arbitrum/sdk/dist/lib/abi/factories/L1GatewayRouter__factory';
 import { L2GatewayRouter__factory } from '@arbitrum/sdk/dist/lib/abi/factories/L2GatewayRouter__factory';
-import { ethers } from 'hardhat';
 import { JsonStorage } from './utils/jsonStorage';
-import { L1CustomGatewayFactory, L2CustomGatewayFactory } from './utils/contractFactories';
 import { parseWallets } from './utils/parseWallets';
+import { L1CustomGateway__factory, L2CustomGateway__factory } from '../typechain-types';
 dotenv.config();
 
 async function main(): Promise<void> {
@@ -22,12 +21,8 @@ async function main(): Promise<void> {
   }
 
   const defaultL2Network = await getL2Network(l2Provider);
-  const l1CustomGateway = (await ethers.getContractFactory(L1CustomGatewayFactory))
-    .attach(deployed.get('l1CustomGateway'))
-    .connect(l1Wallet);
-  const l2CustomGateway = (await ethers.getContractFactory(L2CustomGatewayFactory))
-    .attach(deployed.get('l2CustomGateway'))
-    .connect(l2Wallet);
+  const l1CustomGateway = L1CustomGateway__factory.connect(deployed.get('l1CustomGateway'), l1Wallet);
+  const l2CustomGateway = L2CustomGateway__factory.connect(deployed.get('l2CustomGateway'), l2Wallet);
   const l1GatewayRouter = L1GatewayRouter__factory.connect(defaultL2Network.tokenBridge.l1GatewayRouter, l1Wallet);
   const l2GatewayRouter = L2GatewayRouter__factory.connect(defaultL2Network.tokenBridge.l2GatewayRouter, l2Wallet);
 

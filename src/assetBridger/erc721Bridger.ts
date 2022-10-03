@@ -4,12 +4,10 @@
  * Modifications Copyright 2022, chicunic
  */
 
-import { defaultAbiCoder } from '@ethersproject/abi';
 import { Signer } from '@ethersproject/abstract-signer';
-import { Provider, BlockTag } from '@ethersproject/abstract-provider';
+import { Provider, BlockTag, TransactionRequest } from '@ethersproject/abstract-provider';
 import { PayableOverrides, Overrides } from '@ethersproject/contracts';
-import { Zero } from '@ethersproject/constants';
-import { BigNumber, ethers } from 'ethers';
+import { BigNumber, BigNumberish, ethers, BytesLike } from 'ethers';
 
 import {
   L1ToL2MessageGasEstimator,
@@ -19,51 +17,101 @@ import {
   L1TransactionReceipt,
   L2Network,
   EventFetcher,
+  RetryableDataTools,
 } from '@arbitrum/sdk';
 import { L1GatewayRouter__factory } from '@arbitrum/sdk/dist/lib/abi/factories/L1GatewayRouter__factory';
 import { L2GatewayRouter__factory } from '@arbitrum/sdk/dist/lib/abi/factories/L2GatewayRouter__factory';
-import { GatewaySetEvent } from '@arbitrum/sdk/dist/lib/abi/L1GatewayRouter';
-import { AssetBridger } from '@arbitrum/sdk/dist/lib/assetBridger/assetBridger';
-import { EthDepositParams, EthWithdrawParams } from '@arbitrum/sdk/dist/lib/assetBridger/ethBridger';
-import { DISABLED_GATEWAY } from '@arbitrum/sdk/dist/lib/dataEntities/constants';
-import { ArbSdkError, MissingProviderArbSdkError } from '@arbitrum/sdk/dist/lib/dataEntities/errors';
-import { SignerProviderUtils } from '@arbitrum/sdk/dist/lib/dataEntities/signerOrProvider';
-import { GasOverrides } from '@arbitrum/sdk/dist/lib/message/L1ToL2MessageGasEstimator';
-import { L1ContractCallTransaction } from '@arbitrum/sdk/dist/lib/message/L1Transaction';
-import { getBaseFee } from '@arbitrum/sdk/dist/lib/utils/lib';
+import {
+  L2ArbitrumGateway__factory,
+  ERC721__factory,
+  ERC721,
+  IL1Token__factory,
+  IL2Token__factory,
+  IL2Token,
+} from '../../typechain-types';
 
-import { ERC721 } from '../../typechain-types/@openzeppelin/contracts/token/ERC721';
 import { WithdrawalInitiatedEvent } from '../../typechain-types/contracts/arbitrum/gateway/L2ArbitrumGateway';
-import { IL2Token } from '../../typechain-types/contracts/arbitrum/IL2Token';
-import { ERC721__factory } from '../../typechain-types/factories/@openzeppelin/contracts/token/ERC721/ERC721__factory';
-import { L2ArbitrumGateway__factory } from '../../typechain-types/factories/contracts/arbitrum/gateway/L2ArbitrumGateway__factory';
-import { L2CustomGateway__factory } from '../../typechain-types/factories/contracts/arbitrum/gateway/L2CustomGateway__factory';
-import { IL2Token__factory } from '../../typechain-types/factories/contracts/arbitrum/IL2Token__factory';
-import { L1CustomGateway__factory } from '../../typechain-types/factories/contracts/ethereum/gateway/L1CustomGateway__factory';
-import { IL1Token__factory } from '../../typechain-types/factories/contracts/ethereum/IL1Token__factory';
+import { GatewaySetEvent } from '@arbitrum/sdk/dist/lib/abi/L1GatewayRouter';
+import { GasOverrides } from '@arbitrum/sdk/dist/lib/message/L1ToL2MessageGasEstimator';
+import { SignerProviderUtils } from '@arbitrum/sdk/dist/lib/dataEntities/signerOrProvider';
+import { ArbSdkError, MissingProviderArbSdkError } from '@arbitrum/sdk/dist/lib/dataEntities/errors';
+import { DISABLED_GATEWAY } from '@arbitrum/sdk/dist/lib/dataEntities/constants';
+import { EthDepositParams, EthWithdrawParams } from '@arbitrum/sdk/dist/lib/assetBridger/ethBridger';
+import { AssetBridger } from '@arbitrum/sdk/dist/lib/assetBridger/assetBridger';
+import { L1ContractCallTransaction } from '@arbitrum/sdk/dist/lib/message/L1Transaction';
+import {
+  isL1ToL2TransactionRequest,
+  isL2ToL1TransactionRequest,
+  L1ToL2TransactionRequest,
+  L2ToL1TransactionRequest,
+} from '@arbitrum/sdk/dist/lib/dataEntities/transactionRequest';
+import { defaultAbiCoder } from '@ethersproject/abi';
+import { OmitTyped, RequiredPick } from '@arbitrum/sdk/dist/lib/utils/types';
+import { EventArgs } from '@arbitrum/sdk/dist/lib/dataEntities/event';
+import { L1ToL2MessageGasParams } from '@arbitrum/sdk/dist/lib/message/L1ToL2MessageCreator';
 
 export interface TokenApproveParams {
-  l1Signer: Signer;
   erc721L1Address: string;
   overrides?: PayableOverrides;
 }
 
-export interface TokenDepositParams extends EthDepositParams {
+export interface Erc721DepositParams extends EthDepositParams {
   l2Provider: Provider;
   erc721L1Address: string;
-  destinationAddress?: string;
   tokenIds: BigNumber[];
+  destinationAddress?: string;
+  excessFeeRefundAddress?: string;
+  callValueRefundAddress?: string;
   retryableGasOverrides?: GasOverrides;
   overrides?: Overrides;
 }
 
-export interface TokenWithdrawParams extends EthWithdrawParams {
+export interface Erc721WithdrawParams extends EthWithdrawParams {
   erc721l1Address: string;
 }
 
-export class Erc721Bridger extends AssetBridger<TokenDepositParams, TokenWithdrawParams> {
+export type L1ToL2TxReqAndSignerProvider = L1ToL2TransactionRequest & {
+  l1Signer: Signer;
+  overrides?: Overrides;
+};
+
+export type L2ToL1TxReqAndSigner = L2ToL1TransactionRequest & {
+  l2Signer: Signer;
+  overrides?: Overrides;
+};
+
+type SignerTokenApproveParams = TokenApproveParams & { l1Signer: Signer };
+type ProviderTokenApproveParams = TokenApproveParams & { l1Provider: Provider };
+export type ApproveParamsOrTxRequest =
+  | SignerTokenApproveParams
+  | {
+      txRequest: Required<Pick<TransactionRequest, 'to' | 'data' | 'value'>>;
+      l1Signer: Signer;
+      overrides?: Overrides;
+    };
+
+type DepositRequest = OmitTyped<Erc721DepositParams, 'overrides' | 'l1Signer'> & {
+  l1Provider: Provider;
+  from: string;
+};
+
+type DefaultedDepositRequest = RequiredPick<
+  DepositRequest,
+  'callValueRefundAddress' | 'excessFeeRefundAddress' | 'destinationAddress'
+>;
+
+/**
+ * Bridger for moving ERC721 tokens back and forth betwen L1 to L2
+ */
+export class Erc721Bridger extends AssetBridger<
+  Erc721DepositParams | L1ToL2TxReqAndSignerProvider,
+  OmitTyped<Erc721WithdrawParams, 'from'> | L2ToL1TransactionRequest
+> {
   public static MIN_CUSTOM_DEPOSIT_GAS_LIMIT = BigNumber.from(275000);
 
+  /**
+   * Bridger for moving ERC721 tokens back and forth betwen L1 to L2
+   */
   public constructor(l2Network: L2Network) {
     super(l2Network);
   }
@@ -97,20 +145,52 @@ export class Erc721Bridger extends AssetBridger<TokenDepositParams, TokenWithdra
   }
 
   /**
+   * Get a tx request to approve tokens for deposit to the bridge.
+   * The tokens will be approved for the relevant gateway.
+   * @param params
+   * @returns
+   */
+  public async getApproveTokenRequest(
+    params: ProviderTokenApproveParams
+  ): Promise<Required<Pick<TransactionRequest, 'to' | 'data' | 'value'>>> {
+    // you approve tokens to the gateway that the router will use
+    const gatewayAddress = await this.getL1GatewayAddress(
+      params.erc721L1Address,
+      SignerProviderUtils.getProviderOrThrow(params.l1Provider)
+    );
+
+    const iErc721Interface = ERC721__factory.createInterface();
+    const data = iErc721Interface.encodeFunctionData('setApprovalForAll', [gatewayAddress, true]);
+
+    return {
+      to: params.erc721L1Address,
+      data,
+      value: BigNumber.from(0),
+    };
+  }
+
+  private isApproveParams(params: ApproveParamsOrTxRequest): params is SignerTokenApproveParams {
+    return (params as SignerTokenApproveParams).erc721L1Address !== undefined;
+  }
+
+  /**
    * Approve tokens for deposit to the bridge. The tokens will be approved for the relevant gateway.
    * @param params
    * @returns
    */
-  public async approveToken(params: TokenApproveParams): Promise<ethers.ContractTransaction> {
-    if (!SignerProviderUtils.signerHasProvider(params.l1Signer)) {
-      throw new MissingProviderArbSdkError('l1Signer');
-    }
+  public async approveToken(params: ApproveParamsOrTxRequest): Promise<ethers.ContractTransaction> {
     await this.checkL1Network(params.l1Signer);
 
-    // you approve tokens to the gateway that the router will use
-    const gatewayAddress = await this.getL1GatewayAddress(params.erc721L1Address, params.l1Signer.provider);
-    const contract = ERC721__factory.connect(params.erc721L1Address, params.l1Signer);
-    return await contract.functions.setApprovalForAll(gatewayAddress, true, params.overrides ?? {});
+    const approveRequest = this.isApproveParams(params)
+      ? await this.getApproveTokenRequest({
+          ...params,
+          l1Provider: SignerProviderUtils.getProviderOrThrow(params.l1Signer),
+        })
+      : params.txRequest;
+    return await params.l1Signer.sendTransaction({
+      ...approveRequest,
+      ...params.overrides,
+    });
   }
 
   /**
@@ -128,16 +208,15 @@ export class Erc721Bridger extends AssetBridger<TokenDepositParams, TokenWithdra
     filter: { fromBlock: BlockTag; toBlock: BlockTag },
     l1TokenAddress?: string,
     fromAddress?: string
-  ): Promise<Array<WithdrawalInitiatedEvent['args'] & { txHash: string }>> {
+  ): Promise<Array<EventArgs<WithdrawalInitiatedEvent> & { txHash: string }>> {
     await this.checkL2Network(l2Provider);
 
     const eventFetcher = new EventFetcher(l2Provider);
     const events = (
       await eventFetcher.getEvents(
-        gatewayAddress,
         L2ArbitrumGateway__factory,
         (contract) => contract.filters.WithdrawalInitiated(null, fromAddress ?? null),
-        filter
+        { ...filter, address: gatewayAddress }
       )
     ).map((a) => ({ txHash: a.transactionHash, ...a.event }));
 
@@ -226,53 +305,28 @@ export class Erc721Bridger extends AssetBridger<TokenDepositParams, TokenWithdra
     return (await l1GatewayRouter.l1TokenToGateway(l1TokenAddress)) === DISABLED_GATEWAY;
   }
 
-  private async validateDepositParams(params: TokenDepositParams): Promise<void> {
-    if (!SignerProviderUtils.signerHasProvider(params.l1Signer)) {
-      throw new MissingProviderArbSdkError('l1Signer');
-    }
-    await this.checkL1Network(params.l1Signer);
-    await this.checkL2Network(params.l2Provider);
-    if ((params.overrides as PayableOverrides | undefined)?.value != null) {
-      throw new ArbSdkError('L1 call value should be set through l1CallValue param');
-    }
+  private applyDefaults<T extends DepositRequest>(params: T): DefaultedDepositRequest {
+    return {
+      ...params,
+      excessFeeRefundAddress: params.excessFeeRefundAddress ?? params.from,
+      callValueRefundAddress: params.callValueRefundAddress ?? params.from,
+      destinationAddress: params.destinationAddress ?? params.from,
+    };
   }
 
-  public async getDepositParams(params: TokenDepositParams): Promise<{
-    erc721L1Address: string;
-    amount: BigNumber;
-    depositCallValue: BigNumber;
-    maxSubmissionFee: BigNumber;
-    data: string;
-    l2GasLimit: BigNumber;
-    l2MaxFeePerGas: BigNumber;
-    destinationAddress: string;
-    retryableCallData: string;
-    retryableSender: string;
-    retryableDestination: string;
-    retryableExcessFeeRefundAddress: string;
-    retryableCallValueRefundAddress: string;
-    retryableValue: BigNumber;
-  }> {
-    const { erc721L1Address, amount, l2Provider, l1Signer, destinationAddress, tokenIds } = params;
-    const { retryableGasOverrides } = params;
+  /**
+   * Get the arguments for calling the deposit function
+   * @param params
+   * @returns
+   */
+  public async getDepositRequest(params: DepositRequest): Promise<L1ToL2TransactionRequest> {
+    await this.checkL1Network(params.l1Provider);
+    await this.checkL2Network(params.l2Provider);
+    const defaultedParams = this.applyDefaults(params);
+    const { amount, destinationAddress, erc721L1Address, l1Provider, l2Provider, retryableGasOverrides, tokenIds } =
+      defaultedParams;
 
-    if (!SignerProviderUtils.signerHasProvider(l1Signer)) {
-      throw new MissingProviderArbSdkError('l1Signer');
-    }
-
-    // 1. get the params for a gas estimate
-    const l1GatewayAddress = await this.getL1GatewayAddress(erc721L1Address, l1Signer.provider);
-    const l1Gateway = L1CustomGateway__factory.connect(l1GatewayAddress, l1Signer.provider);
-    const sender = await l1Signer.getAddress();
-    const to = destinationAddress ?? sender;
-    const extraData = defaultAbiCoder.encode(['uint256[]'], [tokenIds]);
-    const depositCalldata = await l1Gateway.getOutboundCalldata(erc721L1Address, sender, to, amount, extraData);
-
-    const estimateGasCallValue = Zero;
-
-    const l2Dest = await l1Gateway.counterpartGateway();
-    const gasEstimator = new L1ToL2MessageGasEstimator(l2Provider);
-
+    const l1GatewayAddress = await this.getL1GatewayAddress(erc721L1Address, l1Provider);
     let tokenGasOverrides: GasOverrides | undefined = retryableGasOverrides;
 
     // we also add a hardcoded minimum gas limit for custom gateway deposits
@@ -284,79 +338,49 @@ export class Erc721Bridger extends AssetBridger<TokenDepositParams, TokenWithdra
       }
     }
 
-    // 2. get the gas estimates
-    const baseFee = await getBaseFee(l1Signer.provider);
-    const excessFeeRefundAddress = sender;
-    const callValueRefundAddress = sender;
-    const estimates = await gasEstimator.estimateAll(
-      l1GatewayAddress,
-      l2Dest,
-      depositCalldata,
-      estimateGasCallValue,
-      baseFee,
-      excessFeeRefundAddress,
-      callValueRefundAddress,
-      l1Signer.provider,
-      tokenGasOverrides
-    );
+    const depositFunc = (depositParams: OmitTyped<L1ToL2MessageGasParams, 'deposit'>): any => {
+      const extraData = defaultAbiCoder.encode(['uint256[]'], [tokenIds]);
+      const innerData = defaultAbiCoder.encode(['uint256', 'bytes'], [depositParams.maxSubmissionCost, extraData]);
+      const iGatewayRouter = L1GatewayRouter__factory.createInterface();
 
-    const data = defaultAbiCoder.encode(['uint256', 'bytes'], [estimates.maxSubmissionFee, extraData]);
+      return {
+        data: iGatewayRouter.encodeFunctionData('outboundTransfer', [
+          erc721L1Address,
+          destinationAddress,
+          amount,
+          depositParams.gasLimit,
+          depositParams.maxFeePerGas,
+          innerData,
+        ]),
+        to: this.l2Network.tokenBridge.l1GatewayRouter,
+        from: defaultedParams.from,
+        value: depositParams.gasLimit.mul(depositParams.maxFeePerGas).add(depositParams.maxSubmissionCost),
+        // we dont include the l2 call value for token deposits because
+        // they either have 0 call value, or their call value is withdrawn from
+        // a contract by the gateway (weth). So in both of these cases the l2 call value
+        // is not actually deposited in the value field
+      };
+    };
+
+    const gasEstimator = new L1ToL2MessageGasEstimator(l2Provider);
+    const estimates = await gasEstimator.populateFunctionParams(depositFunc, l1Provider, tokenGasOverrides);
 
     return {
-      l2GasLimit: estimates.gasLimit,
-      maxSubmissionFee: estimates.maxSubmissionFee,
-      l2MaxFeePerGas: estimates.maxFeePerGas,
-      depositCallValue: estimates.totalL2GasCosts,
-      destinationAddress: to,
-      data,
-      amount,
-      erc721L1Address,
-      retryableCallData: depositCalldata,
-      retryableSender: l1GatewayAddress,
-      retryableDestination: l2Dest,
-      retryableExcessFeeRefundAddress: excessFeeRefundAddress,
-      retryableCallValueRefundAddress: callValueRefundAddress,
-      retryableValue: estimateGasCallValue,
+      txRequest: {
+        to: this.l2Network.tokenBridge.l1GatewayRouter,
+        data: estimates.data,
+        value: estimates.value,
+        from: params.from,
+      },
+      retryableData: {
+        ...estimates.retryable,
+        ...estimates.estimates,
+      },
+      isValid: async () => {
+        const reEstimates = await gasEstimator.populateFunctionParams(depositFunc, l1Provider, tokenGasOverrides);
+        return await L1ToL2MessageGasEstimator.isValid(estimates.estimates, reEstimates.estimates);
+      },
     };
-  }
-
-  private async depositTxOrGas<T extends boolean>(
-    params: TokenDepositParams,
-    estimate: T
-  ): Promise<T extends true ? BigNumber : ethers.ContractTransaction>;
-  private async depositTxOrGas<T extends boolean>(
-    params: TokenDepositParams,
-    estimate: T
-  ): Promise<BigNumber | ethers.ContractTransaction> {
-    await this.validateDepositParams(params);
-    const depositParams = await this.getDepositParams(params);
-
-    const l1GatewayRouter = L1GatewayRouter__factory.connect(
-      this.l2Network.tokenBridge.l1GatewayRouter,
-      params.l1Signer
-    );
-
-    return await (estimate ? l1GatewayRouter.estimateGas : l1GatewayRouter.functions).outboundTransfer(
-      depositParams.erc721L1Address,
-      depositParams.destinationAddress,
-      depositParams.amount,
-      depositParams.l2GasLimit,
-      depositParams.l2MaxFeePerGas,
-      depositParams.data,
-      {
-        value: depositParams.depositCallValue,
-        ...params.overrides,
-      }
-    );
-  }
-
-  /**
-   * Estimate the gas required for a token deposit
-   * @param params
-   * @returns
-   */
-  public async depositEstimateGas(params: TokenDepositParams): Promise<BigNumber> {
-    return await this.depositTxOrGas(params, true);
   }
 
   /**
@@ -364,45 +388,73 @@ export class Erc721Bridger extends AssetBridger<TokenDepositParams, TokenWithdra
    * @param params
    * @returns
    */
-  public async deposit(params: TokenDepositParams): Promise<L1ContractCallTransaction> {
-    const tx = await this.depositTxOrGas(params, false);
+  public async deposit(params: Erc721DepositParams | L1ToL2TxReqAndSignerProvider): Promise<L1ContractCallTransaction> {
+    await this.checkL1Network(params.l1Signer);
+
+    // Although the types prevent should alert callers that value is not
+    // a valid override, it is possible that they pass it in anyway as it's a common override
+    // We do a safety check here
+    if ((params.overrides as PayableOverrides | undefined)?.value != null) {
+      throw new ArbSdkError('L1 call value should be set through l1CallValue param');
+    }
+
+    const l1Provider = SignerProviderUtils.getProviderOrThrow(params.l1Signer);
+    const tokenDeposit = isL1ToL2TransactionRequest(params)
+      ? params
+      : await this.getDepositRequest({
+          ...params,
+          l1Provider,
+          from: await params.l1Signer.getAddress(),
+        });
+
+    const tx = await params.l1Signer.sendTransaction({
+      ...tokenDeposit.txRequest,
+      ...params.overrides,
+    });
+
     return L1TransactionReceipt.monkeyPatchContractCallWait(tx);
   }
 
-  private async withdrawTxOrGas<T extends boolean>(
-    params: TokenWithdrawParams,
-    estimate: T
-  ): Promise<T extends true ? BigNumber : ethers.ContractTransaction>;
-  private async withdrawTxOrGas<T extends boolean>(
-    params: TokenWithdrawParams,
-    estimate: T
-  ): Promise<BigNumber | ethers.ContractTransaction> {
-    if (!SignerProviderUtils.signerHasProvider(params.l2Signer)) {
-      throw new MissingProviderArbSdkError('l2Signer');
-    }
-    await this.checkL2Network(params.l2Signer);
-
-    const to = params.destinationAddress ?? (await params.l2Signer.getAddress());
-
-    const l2GatewayRouter = L2GatewayRouter__factory.connect(
-      this.l2Network.tokenBridge.l2GatewayRouter,
-      params.l2Signer
-    );
-
-    return await (estimate ? l2GatewayRouter.estimateGas : l2GatewayRouter.functions)[
-      'outboundTransfer(address,address,uint256,bytes)'
-    ](params.erc721l1Address, to, params.amount, '0x', {
-      ...(params.overrides ?? {}),
-    });
-  }
-
   /**
-   * Estimate gas for withdrawing tokens from L2 to L1
+   * Get the arguments for calling the token withdrawal function
    * @param params
    * @returns
    */
-  public async withdrawEstimateGas(params: TokenWithdrawParams): Promise<BigNumber> {
-    return await this.withdrawTxOrGas(params, true);
+  public async getWithdrawalRequest(params: Erc721WithdrawParams): Promise<L2ToL1TransactionRequest> {
+    const to = params.destinationAddress;
+
+    const routerInterface = L2GatewayRouter__factory.createInterface();
+    const functionData =
+      // we need to do this since typechain doesnt seem to correctly create
+      // encodeFunctionData for functions with overrides
+      (
+        routerInterface as unknown as {
+          encodeFunctionData: (
+            functionFragment: 'outboundTransfer(address,address,uint256,bytes)',
+            values: [string, string, BigNumberish, BytesLike]
+          ) => string;
+        }
+      ).encodeFunctionData('outboundTransfer(address,address,uint256,bytes)', [
+        params.erc721l1Address,
+        to,
+        params.amount,
+        '0x',
+      ]);
+
+    return {
+      txRequest: {
+        data: functionData,
+        to: this.l2Network.tokenBridge.l2GatewayRouter,
+        value: BigNumber.from(0),
+        from: params.from,
+      },
+      // we make this async and expect a provider since we
+      // in the future we want to do proper estimation here
+      /* eslint-disable @typescript-eslint/no-unused-vars */
+      estimateL1GasLimit: async (l1Provider: Provider) => {
+        return BigNumber.from(160000);
+      },
+    };
   }
 
   /**
@@ -410,8 +462,27 @@ export class Erc721Bridger extends AssetBridger<TokenDepositParams, TokenWithdra
    * @param params
    * @returns
    */
-  public async withdraw(params: TokenWithdrawParams): Promise<L2ContractTransaction> {
-    const tx = await this.withdrawTxOrGas(params, false);
+  public async withdraw(
+    params: (OmitTyped<Erc721WithdrawParams, 'from'> & { l2Signer: Signer }) | L2ToL1TxReqAndSigner
+  ): Promise<L2ContractTransaction> {
+    if (!SignerProviderUtils.signerHasProvider(params.l2Signer)) {
+      throw new MissingProviderArbSdkError('l2Signer');
+    }
+    await this.checkL2Network(params.l2Signer);
+
+    const withdrawalRequest = isL2ToL1TransactionRequest<
+      OmitTyped<Erc721WithdrawParams, 'from'> & { l2Signer: Signer }
+    >(params)
+      ? params
+      : await this.getWithdrawalRequest({
+          ...params,
+          from: await params.l2Signer.getAddress(),
+        });
+
+    const tx = await params.l2Signer.sendTransaction({
+      ...withdrawalRequest.txRequest,
+      ...params.overrides,
+    });
     return L2TransactionReceipt.monkeyPatchWait(tx);
   }
 }
@@ -464,169 +535,83 @@ export class AdminErc721Bridger extends Erc721Bridger {
         `L2 token does not have l1 address set. Set address: ${l1AddressFromL2}, expected address: ${l1TokenAddress}.`
       );
     }
-    const gasPriceEstimator = new L1ToL2MessageGasEstimator(l2Provider);
 
-    // internally the registerTokenOnL2 sends two l1tol2 messages
-    // the first registers the tokens and the second sets the gateways
-    // we need to estimate gas for each of these l1tol2 messages
-    // 1. registerTokenFromL1
-    const il2CustomGateway = L2CustomGateway__factory.createInterface();
-    const l2SetTokenCallData = il2CustomGateway.encodeFunctionData('registerTokenFromL1', [
-      [l1TokenAddress],
-      [l2TokenAddress],
-    ]);
-
-    const l1SignerAddr = await l1Signer.getAddress();
-    const baseFee = await getBaseFee(l1Signer.provider);
-    const setTokenEstimates = await gasPriceEstimator.estimateAll(
-      this.l2Network.tokenBridge.l1CustomGateway,
-      this.l2Network.tokenBridge.l2CustomGateway,
-      l2SetTokenCallData,
-      Zero,
-      baseFee,
-      l1SignerAddr,
-      l1SignerAddr,
-      l1Signer.provider
-    );
-
-    // 2. setGateway
-    const iL2GatewayRouter = L2GatewayRouter__factory.createInterface();
-    const l2SetGatewaysCallData = iL2GatewayRouter.encodeFunctionData('setGateway', [
-      [l1TokenAddress],
-      [this.l2Network.tokenBridge.l1CustomGateway],
-    ]);
-
-    const setGatwayEstimates = await gasPriceEstimator.estimateAll(
-      this.l2Network.tokenBridge.l1GatewayRouter,
-      this.l2Network.tokenBridge.l2GatewayRouter,
-      l2SetGatewaysCallData,
-      Zero,
-      baseFee,
-      l1SignerAddr,
-      l1SignerAddr,
-      l1Signer.provider
-    );
-
-    // now execute the registration
-    const customRegistrationTx = await l1Token.registerTokenOnL2(
-      l2TokenAddress,
-      setTokenEstimates.maxSubmissionFee,
-      setGatwayEstimates.maxSubmissionFee,
-      setTokenEstimates.gasLimit,
-      setGatwayEstimates.gasLimit,
-      setGatwayEstimates.maxFeePerGas,
-      setTokenEstimates.totalL2GasCosts,
-      setGatwayEstimates.totalL2GasCosts,
-      l1SenderAddress,
-      {
-        value: setTokenEstimates.totalL2GasCosts.add(setGatwayEstimates.totalL2GasCosts),
-      }
-    );
-
-    return L1TransactionReceipt.monkeyPatchWait(customRegistrationTx);
-  }
-
-  /**
-   * Register a custom token on the Arbitrum bridge
-   * See https://developer.offchainlabs.com/docs/bridging_assets#the-arbitrum-generic-custom-gateway for more details
-   * @param l1TokenAddress Address of the already deployed l1 token. Must inherit from https://developer.offchainlabs.com/docs/sol_contract_docs/md_docs/arb-bridge-peripherals/tokenbridge/ethereum/icustomtoken.
-   * @param l2TokenAddress Address of the already deployed l2 token. Must inherit from https://developer.offchainlabs.com/docs/sol_contract_docs/md_docs/arb-bridge-peripherals/tokenbridge/arbitrum/iarbtoken.
-   * @param l1Signer The signer with the rights to call registerTokenOnL2 on the l1 token
-   * @param l2Provider Arbitrum rpc provider
-   * @returns
-   */
-  public async forceRegisterCustomToken(
-    l1TokenAddress: string,
-    l2TokenAddress: string,
-    l1Signer: Signer,
-    l2Provider: Provider
-  ): Promise<L1ContractTransaction> {
-    if (!SignerProviderUtils.signerHasProvider(l1Signer)) {
-      throw new MissingProviderArbSdkError('l1Signer');
+    interface GasParams {
+      maxSubmissionCost: BigNumber;
+      gasLimit: BigNumber;
     }
-    await this.checkL1Network(l1Signer);
-    await this.checkL2Network(l2Provider);
+    const from = await l1Signer.getAddress();
+    const encodeFuncData = (setTokenGas: GasParams, setGatewayGas: GasParams, maxFeePerGas: BigNumber): any => {
+      // if we set maxFeePerGas to be the error triggering param then it will
+      // always trigger for the setToken call and never make it ti setGateways
+      // so we here we just use the gas limit to trigger retryable data
+      const doubleFeePerGas = maxFeePerGas.eq(RetryableDataTools.ErrorTriggeringParams.maxFeePerGas)
+        ? RetryableDataTools.ErrorTriggeringParams.maxFeePerGas.mul(2)
+        : maxFeePerGas;
+      const setTokenDeposit = setTokenGas.gasLimit.mul(doubleFeePerGas).add(setTokenGas.maxSubmissionCost);
+      const setGatewayDeposit = setGatewayGas.gasLimit.mul(doubleFeePerGas).add(setGatewayGas.maxSubmissionCost);
 
-    const l1Token = ERC721__factory.connect(l1TokenAddress, l1Signer);
-    const l2Token = IL2Token__factory.connect(l2TokenAddress, l2Provider);
+      const data = l1Token.interface.encodeFunctionData('registerTokenOnL2', [
+        l2TokenAddress,
+        setTokenGas.maxSubmissionCost,
+        setGatewayGas.maxSubmissionCost,
+        setTokenGas.gasLimit,
+        setGatewayGas.gasLimit,
+        doubleFeePerGas,
+        setTokenDeposit,
+        setGatewayDeposit,
+        l1SenderAddress,
+      ]);
 
-    // sanity checks
-    await l1Token.deployed();
-    await l2Token.deployed();
+      return {
+        data,
+        value: setTokenDeposit.add(setGatewayDeposit),
+        to: l1Token.address,
+        from,
+      };
+    };
 
-    const l1AddressFromL2 = await l2Token.l1Address();
-    if (l1AddressFromL2 !== l1TokenAddress) {
-      throw new ArbSdkError(
-        `L2 token does not have l1 address set. Set address: ${l1AddressFromL2}, expected address: ${l1TokenAddress}.`
-      );
-    }
-    const gasPriceEstimator = new L1ToL2MessageGasEstimator(l2Provider);
-
-    // internally the registerTokenOnL2 sends two l1tol2 messages
-    // the first registers the tokens and the second sets the gateways
-    // we need to estimate gas for each of these l1tol2 messages
-    // 1. registerTokenFromL1
-    const il2CustomGateway = L2CustomGateway__factory.createInterface();
-    const l2SetTokenCallData = il2CustomGateway.encodeFunctionData('registerTokenFromL1', [
-      [l1TokenAddress],
-      [l2TokenAddress],
-    ]);
-
-    const l1SignerAddr = await l1Signer.getAddress();
-    const baseFee = await getBaseFee(l1Signer.provider);
-    const setTokenEstimates = await gasPriceEstimator.estimateAll(
-      this.l2Network.tokenBridge.l1CustomGateway,
-      this.l2Network.tokenBridge.l2CustomGateway,
-      l2SetTokenCallData,
-      Zero,
-      baseFee,
-      l1SignerAddr,
-      l1SignerAddr,
-      l1Signer.provider
+    const l1Provider = l1Signer.provider;
+    const gEstimator = new L1ToL2MessageGasEstimator(l2Provider);
+    const setTokenEstimates2 = await gEstimator.populateFunctionParams(
+      (params: OmitTyped<L1ToL2MessageGasParams, 'deposit'>) =>
+        encodeFuncData(
+          {
+            gasLimit: params.gasLimit,
+            maxSubmissionCost: params.maxSubmissionCost,
+          },
+          {
+            gasLimit: RetryableDataTools.ErrorTriggeringParams.gasLimit,
+            maxSubmissionCost: BigNumber.from(1),
+          },
+          params.maxFeePerGas
+        ),
+      l1Provider
     );
 
-    // 2. setGateway
-    const iL2GatewayRouter = L2GatewayRouter__factory.createInterface();
-    const l2SetGatewaysCallData = iL2GatewayRouter.encodeFunctionData('setGateway', [
-      [l1TokenAddress],
-      [this.l2Network.tokenBridge.l1CustomGateway],
-    ]);
-
-    const setGatwayEstimates = await gasPriceEstimator.estimateAll(
-      this.l2Network.tokenBridge.l1GatewayRouter,
-      this.l2Network.tokenBridge.l2GatewayRouter,
-      l2SetGatewaysCallData,
-      Zero,
-      baseFee,
-      l1SignerAddr,
-      l1SignerAddr,
-      l1Signer.provider
+    const setGatewayEstimates2 = await gEstimator.populateFunctionParams(
+      (params: OmitTyped<L1ToL2MessageGasParams, 'deposit'>) =>
+        encodeFuncData(
+          {
+            gasLimit: setTokenEstimates2.estimates.gasLimit,
+            maxSubmissionCost: setTokenEstimates2.estimates.maxSubmissionCost,
+          },
+          {
+            gasLimit: params.gasLimit,
+            maxSubmissionCost: params.maxSubmissionCost,
+          },
+          params.maxFeePerGas
+        ),
+      l1Provider
     );
 
-    // now execute the registration
-    const l1CustomGateway = L1CustomGateway__factory.connect(this.l2Network.tokenBridge.l1CustomGateway, l1Signer);
-    await l1CustomGateway.forceRegisterTokenToL2(
-      [l1TokenAddress],
-      [l2TokenAddress],
-      setTokenEstimates.gasLimit,
-      setGatwayEstimates.maxFeePerGas,
-      setTokenEstimates.maxSubmissionFee,
-      {
-        value: setTokenEstimates.totalL2GasCosts,
-      }
-    );
-    const l1GatewayRouter = L1GatewayRouter__factory.connect(this.l2Network.tokenBridge.l1GatewayRouter, l1Signer);
-    const gatewayRegistrationTx = await l1GatewayRouter.setGateways(
-      [l1TokenAddress],
-      [this.l2Network.tokenBridge.l1CustomGateway],
-      setGatwayEstimates.gasLimit,
-      setGatwayEstimates.maxFeePerGas,
-      setGatwayEstimates.maxSubmissionFee,
-      {
-        value: setGatwayEstimates.totalL2GasCosts,
-      }
-    );
-    return L1TransactionReceipt.monkeyPatchWait(gatewayRegistrationTx);
+    const registerTx = await l1Signer.sendTransaction({
+      to: l1Token.address,
+      data: setGatewayEstimates2.data,
+      value: setGatewayEstimates2.value,
+    });
+
+    return L1TransactionReceipt.monkeyPatchWait(registerTx);
   }
 
   /**
@@ -638,18 +623,16 @@ export class AdminErc721Bridger extends Erc721Bridger {
   public async getL1GatewaySetEvents(
     l1Provider: Provider,
     filter: { fromBlock: BlockTag; toBlock: BlockTag }
-  ): Promise<Array<GatewaySetEvent['args']>> {
+  ): Promise<Array<EventArgs<GatewaySetEvent>>> {
     await this.checkL1Network(l1Provider);
 
     const l1GatewayRouterAddress = this.l2Network.tokenBridge.l1GatewayRouter;
     const eventFetcher = new EventFetcher(l1Provider);
     return (
-      await eventFetcher.getEvents(
-        l1GatewayRouterAddress,
-        L1GatewayRouter__factory,
-        (t) => t.filters.GatewaySet(),
-        filter
-      )
+      await eventFetcher.getEvents(L1GatewayRouter__factory, (t) => t.filters.GatewaySet(), {
+        ...filter,
+        address: l1GatewayRouterAddress,
+      })
     ).map((a) => a.event);
   }
 
@@ -663,7 +646,7 @@ export class AdminErc721Bridger extends Erc721Bridger {
     l2Provider: Provider,
     filter: { fromBlock: BlockTag; toBlock: BlockTag },
     customNetworkL2GatewayRouter?: string
-  ): Promise<Array<GatewaySetEvent['args']>> {
+  ): Promise<Array<EventArgs<GatewaySetEvent>>> {
     if (this.l2Network.isCustom && customNetworkL2GatewayRouter == null) {
       throw new ArbSdkError('Must supply customNetworkL2GatewayRouter for custom network ');
     }
@@ -673,12 +656,10 @@ export class AdminErc721Bridger extends Erc721Bridger {
 
     const eventFetcher = new EventFetcher(l2Provider);
     return (
-      await eventFetcher.getEvents(
-        l2GatewayRouterAddress,
-        L1GatewayRouter__factory,
-        (t) => t.filters.GatewaySet(),
-        filter
-      )
+      await eventFetcher.getEvents(L1GatewayRouter__factory, (t) => t.filters.GatewaySet(), {
+        ...filter,
+        address: l2GatewayRouterAddress,
+      })
     ).map((a) => a.event);
   }
 
@@ -692,7 +673,8 @@ export class AdminErc721Bridger extends Erc721Bridger {
   public async setGateways(
     l1Signer: Signer,
     l2Provider: Provider,
-    tokenGateways: TokenAndGateway[]
+    tokenGateways: TokenAndGateway[],
+    options?: GasOverrides
   ): Promise<L1ContractCallTransaction> {
     if (!SignerProviderUtils.signerHasProvider(l1Signer)) {
       throw new MissingProviderArbSdkError('l1Signer');
@@ -700,37 +682,32 @@ export class AdminErc721Bridger extends Erc721Bridger {
     await this.checkL1Network(l1Signer);
     await this.checkL2Network(l2Provider);
 
-    const estimator = new L1ToL2MessageGasEstimator(l2Provider);
-    const baseFee = await getBaseFee(l1Signer.provider);
-
-    const iL2GatewayRouter = L2GatewayRouter__factory.createInterface();
-    const l2SetGatewaysCallData = iL2GatewayRouter.encodeFunctionData('setGateway', [
-      tokenGateways.map((tG) => tG.tokenAddr),
-      tokenGateways.map((tG) => tG.gatewayAddr),
-    ]);
-
-    const l1SignerAddr = await l1Signer.getAddress();
-    const estimates = await estimator.estimateAll(
-      this.l2Network.tokenBridge.l1GatewayRouter,
-      this.l2Network.tokenBridge.l2GatewayRouter,
-      l2SetGatewaysCallData,
-      Zero,
-      baseFee,
-      l1SignerAddr,
-      l1SignerAddr,
-      l1Signer.provider
-    );
+    const from = await l1Signer.getAddress();
 
     const l1GatewayRouter = L1GatewayRouter__factory.connect(this.l2Network.tokenBridge.l1GatewayRouter, l1Signer);
 
-    const res = await l1GatewayRouter.functions.setGateways(
-      tokenGateways.map((tG) => tG.tokenAddr),
-      tokenGateways.map((tG) => tG.gatewayAddr),
-      estimates.gasLimit,
-      estimates.maxFeePerGas,
-      estimates.maxSubmissionFee,
-      { value: estimates.totalL2GasCosts }
-    );
+    const setGatewaysFunc = (params: OmitTyped<L1ToL2MessageGasParams, 'deposit'>): any => {
+      return {
+        data: l1GatewayRouter.interface.encodeFunctionData('setGateways', [
+          tokenGateways.map((tG) => tG.tokenAddr),
+          tokenGateways.map((tG) => tG.gatewayAddr),
+          params.gasLimit,
+          params.maxFeePerGas,
+          params.maxSubmissionCost,
+        ]),
+        from,
+        value: params.gasLimit.mul(params.maxFeePerGas).add(params.maxSubmissionCost),
+        to: l1GatewayRouter.address,
+      };
+    };
+    const gEstimator = new L1ToL2MessageGasEstimator(l2Provider);
+    const estimates = await gEstimator.populateFunctionParams(setGatewaysFunc, l1Signer.provider, options);
+
+    const res = await l1Signer.sendTransaction({
+      to: estimates.to,
+      data: estimates.data,
+      value: estimates.estimates.deposit,
+    });
 
     return L1TransactionReceipt.monkeyPatchContractCallWait(res);
   }

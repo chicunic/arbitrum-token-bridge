@@ -1,11 +1,6 @@
 import * as dotenv from 'dotenv';
 import { run } from 'hardhat';
 import { JsonStorage } from './utils/jsonStorage';
-import {
-  ProxyAdminFactory,
-  TransparentUpgradeableProxyFactory,
-  L2CustomGatewayFactory,
-} from './utils/contractFactories';
 dotenv.config();
 
 async function main(): Promise<void> {
@@ -15,25 +10,25 @@ async function main(): Promise<void> {
     {
       name: 'ProxyAdmin',
       address: deployed.get('l2ProxyAdmin'),
-      contract: ProxyAdminFactory,
+      contract: '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol:ProxyAdmin',
       constructorArguments: [],
     },
     {
       name: 'GatewayRouter Proxy',
       address: deployed.get('l2GatewayRouter'),
-      contract: TransparentUpgradeableProxyFactory,
+      contract: '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy',
       constructorArguments: [deployed.get('l2GatewayRouterLogic'), deployed.get('l2ProxyAdmin'), '0x'],
     },
     {
       name: 'CustomGateway Logic',
       address: deployed.get('l2CustomGatewayLogic'),
-      contract: L2CustomGatewayFactory,
+      contract: 'contracts/arbitrum/gateway/L2CustomGateway.sol:L2CustomGateway',
       constructorArguments: [],
     },
     {
       name: 'CustomGateway Proxy',
       address: deployed.get('l2CustomGateway'),
-      contract: TransparentUpgradeableProxyFactory,
+      contract: '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy',
       constructorArguments: [deployed.get('l2CustomGatewayLogic'), deployed.get('l2ProxyAdmin'), '0x'],
     },
   ];

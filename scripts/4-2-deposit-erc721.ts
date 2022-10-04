@@ -37,25 +37,22 @@ async function main(): Promise<void> {
   };
   const bridge = new Erc721Bridger(l2Network);
 
-  const l1token = L1Token__factory.connect(deployed.get('l1ERC721Token'), l1Wallet);
-  const l2token = L2Token__factory.connect(deployed.get('l2ERC721Token'), l2Wallet);
-
-  // pre check
-  const expectedL1GatewayAddress = await bridge.getL1GatewayAddress(deployed.get('l1ERC721Token'), l1Provider);
-  const initialBridgeTokenBalance: BigNumber = await l1token.balanceOf(expectedL1GatewayAddress);
-  console.log('4-1: L1 Bridge balance', initialBridgeTokenBalance.toString());
+  const l1token = L1Token__factory.connect(deployed.get('l1ERC721Token'), l1Provider);
+  const l2token = L2Token__factory.connect(deployed.get('l2ERC721Token'), l2Provider);
 
   // mint
   {
-    const balance: BigNumber = await l1token.balanceOf(l1Wallet.address);
-    if (BigNumber.from(balance).lt(amount)) {
-      const mintTx = await l1token['mint(address,uint256[])'](l1Wallet.address, tokenIds);
+    const balance1: BigNumber = await l1token.balanceOf(l1Wallet.address);
+    if (BigNumber.from(balance1).lt(amount)) {
+      const mintTx = await l1token.connect(l1Wallet)['mint(address,uint256[])'](l1Wallet.address, tokenIds);
       await mintTx.wait();
-      const newBalance: BigNumber = await l1token.balanceOf(l1Wallet.address);
-      console.log('4-2: L1 ERC721 balance', newBalance.toString());
+      const newBalance1: BigNumber = await l1token.balanceOf(l1Wallet.address);
+      console.log('4-1: L1 ERC721 balance', newBalance1.toString());
     } else {
-      console.log('4-2: L1 ERC721 balance', balance.toString());
+      console.log('4-1: L1 ERC721 balance', balance1.toString());
     }
+    const balance2: BigNumber = await l2token.balanceOf(l2Wallet.address);
+    console.log('     L2 ERC721 balance', balance2.toString());
   }
 
   // approve
@@ -67,9 +64,9 @@ async function main(): Promise<void> {
         erc721L1Address: deployed.get('l1ERC721Token'),
       });
       await approveTx.wait();
-      console.log('4-3: L1 ERC721 approved');
+      console.log('4-2: L1 ERC721 approved');
     } else {
-      console.log('4-3: L1 ERC721 already approved');
+      console.log('4-2: L1 ERC721 already approved');
     }
   }
 
@@ -82,18 +79,19 @@ async function main(): Promise<void> {
     tokenIds,
   });
   const depositRec = await depositTx.wait();
-  console.log('4-4: L1 ER721 deposited');
+  console.log(`4-3: L1 ERC721 deposited ${amount.toString()}`);
   const l2Result = await depositRec.waitForL2(l2Provider);
   l2Result.complete
-    ? console.log(`4-5: L2 message successful: status: ${L1ToL2MessageStatus[l2Result.status]}`)
-    : console.log(`4-5: L2 message failed: status ${L1ToL2MessageStatus[l2Result.status]}`);
+    ? console.log(`     L2 message successful: status: ${L1ToL2MessageStatus[l2Result.status]}`)
+    : console.log(`     L2 message failed: status ${L1ToL2MessageStatus[l2Result.status]}`);
 
   // post check
-  const finalBridgeTokenBalance: BigNumber = await l1token.balanceOf(expectedL1GatewayAddress);
-  console.log('4-6: Final L1 Bridge balance', finalBridgeTokenBalance.toString());
-
-  const finalBalance: BigNumber = await l2token.balanceOf(l2Wallet.address);
-  console.log('4-7: L2 ERC721 balance', finalBalance.toString());
+  {
+    const balance1: BigNumber = await l1token.balanceOf(l1Wallet.address);
+    console.log('4-4: L1 ERC721 balance', balance1.toString());
+    const balance2: BigNumber = await l2token.balanceOf(l2Wallet.address);
+    console.log('     L2 ERC721 balance', balance2.toString());
+  }
 
   console.log('Done.');
 }

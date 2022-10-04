@@ -16,8 +16,7 @@ async function main(): Promise<void> {
 
   // deploy L1 contracts
   if (deployed.get('l1ProxyAdmin') == null) {
-    const L1ProxyAdmin = new ProxyAdmin__factory(l1Wallet);
-    const l1ProxyAdmin = await L1ProxyAdmin.deploy();
+    const l1ProxyAdmin = await new ProxyAdmin__factory(l1Wallet).deploy();
     await l1ProxyAdmin.deployed();
     deployed.set('l1ProxyAdmin', l1ProxyAdmin.address);
     console.log('1-1: L1 ProxyAdmin deployed at', l1ProxyAdmin.address);
@@ -26,8 +25,7 @@ async function main(): Promise<void> {
   }
 
   if (deployed.get('l1CustomGatewayLogic') == null) {
-    const L1CustomGateway = new L1CustomGateway__factory(l1Wallet);
-    const l1CustomGatewayLogic = await L1CustomGateway.deploy();
+    const l1CustomGatewayLogic = await new L1CustomGateway__factory(l1Wallet).deploy();
     await l1CustomGatewayLogic.deployed();
     deployed.set('l1CustomGatewayLogic', l1CustomGatewayLogic.address);
     console.log('1-2: L1 CustomGateway Logic deployed at', l1CustomGatewayLogic.address);
@@ -36,8 +34,7 @@ async function main(): Promise<void> {
   }
 
   if (deployed.get('l1CustomGateway') == null) {
-    const L1TransparentUpgradeableProxy = new TransparentUpgradeableProxy__factory(l1Wallet);
-    const l1CustomGatewayProxy = await L1TransparentUpgradeableProxy.deploy(
+    const l1CustomGatewayProxy = await new TransparentUpgradeableProxy__factory(l1Wallet).deploy(
       deployed.get('l1CustomGatewayLogic'),
       deployed.get('l1ProxyAdmin'),
       '0x'
@@ -51,8 +48,7 @@ async function main(): Promise<void> {
 
   // deploy L2 contracts
   if (deployed.get('l2ProxyAdmin') == null) {
-    const L2ProxyAdmin = new ProxyAdmin__factory(l2Wallet);
-    const l2ProxyAdmin = await L2ProxyAdmin.deploy();
+    const l2ProxyAdmin = await new ProxyAdmin__factory(l2Wallet).deploy();
     await l2ProxyAdmin.deployed();
     deployed.set('l2ProxyAdmin', l2ProxyAdmin.address);
     console.log('1-4: L2 ProxyAdmin deployed at', l2ProxyAdmin.address);
@@ -61,8 +57,7 @@ async function main(): Promise<void> {
   }
 
   if (deployed.get('l2CustomGatewayLogic') == null) {
-    const L2CustomGateway = new L2CustomGateway__factory(l2Wallet);
-    const l2CustomGatewayLogic = await L2CustomGateway.deploy();
+    const l2CustomGatewayLogic = await new L2CustomGateway__factory(l2Wallet).deploy();
     await l2CustomGatewayLogic.deployed();
     deployed.set('l2CustomGatewayLogic', l2CustomGatewayLogic.address);
     console.log('1-5: L2 CustomGateway Logic deployed at', l2CustomGatewayLogic.address);
@@ -71,8 +66,7 @@ async function main(): Promise<void> {
   }
 
   if (deployed.get('l2CustomGateway') == null) {
-    const L2TransparentUpgradeableProxy = new TransparentUpgradeableProxy__factory(l2Wallet);
-    const l2CustomGatewayProxy = await L2TransparentUpgradeableProxy.deploy(
+    const l2CustomGatewayProxy = await new TransparentUpgradeableProxy__factory(l2Wallet).deploy(
       deployed.get('l2CustomGatewayLogic'),
       deployed.get('l2ProxyAdmin'),
       '0x'

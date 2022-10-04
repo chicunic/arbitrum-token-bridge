@@ -8,7 +8,7 @@ import { L1CustomGateway__factory, L2CustomGateway__factory } from '../typechain
 dotenv.config();
 
 async function main(): Promise<void> {
-  const { l2Provider, l1Wallet, l2Wallet } = parseWallets();
+  const { l1Provider, l2Provider } = parseWallets();
   const deployed = new JsonStorage('../deployed.json');
   if (deployed.get('l1ProxyAdmin') == null || deployed.get('l2ProxyAdmin') == null) {
     throw Error('ProxyAdmin not deployed');
@@ -21,10 +21,10 @@ async function main(): Promise<void> {
   }
 
   const defaultL2Network = await getL2Network(l2Provider);
-  const l1CustomGateway = L1CustomGateway__factory.connect(deployed.get('l1CustomGateway'), l1Wallet);
-  const l2CustomGateway = L2CustomGateway__factory.connect(deployed.get('l2CustomGateway'), l2Wallet);
-  const l1GatewayRouter = L1GatewayRouter__factory.connect(defaultL2Network.tokenBridge.l1GatewayRouter, l1Wallet);
-  const l2GatewayRouter = L2GatewayRouter__factory.connect(defaultL2Network.tokenBridge.l2GatewayRouter, l2Wallet);
+  const l1CustomGateway = L1CustomGateway__factory.connect(deployed.get('l1CustomGateway'), l1Provider);
+  const l2CustomGateway = L2CustomGateway__factory.connect(deployed.get('l2CustomGateway'), l2Provider);
+  const l1GatewayRouter = L1GatewayRouter__factory.connect(defaultL2Network.tokenBridge.l1GatewayRouter, l1Provider);
+  const l2GatewayRouter = L2GatewayRouter__factory.connect(defaultL2Network.tokenBridge.l2GatewayRouter, l2Provider);
 
   let checkpass = true;
   // check CustomGateway

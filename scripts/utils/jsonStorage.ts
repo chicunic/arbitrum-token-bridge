@@ -16,8 +16,10 @@ export declare interface DeployedType {
   l2CustomGateway?: string;
   l1CustomGatewayInitialized?: boolean;
   l2CustomGatewayInitialized?: boolean;
-  l1Token?: string;
-  l2Token?: string;
+  l1ERC20Token?: string;
+  l2ERC20Token?: string;
+  l1ERC721Token?: string;
+  l2ERC721Token?: string;
 }
 
 export class JsonStorage {

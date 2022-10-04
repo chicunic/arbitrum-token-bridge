@@ -33,8 +33,10 @@ async function main(): Promise<void> {
 
   // deploy L1 contracts
   if (deployed.get('l1ERC20Token') == null) {
-    const L1Token = new L1Token__factory(l1Wallet);
-    const l1token = await L1Token.deploy(deployed.get('l1CustomGateway'), l2Network.tokenBridge.l1GatewayRouter);
+    const l1token = await new L1Token__factory(l1Wallet).deploy(
+      deployed.get('l1CustomGateway'),
+      l2Network.tokenBridge.l1GatewayRouter
+    );
     await l1token.deployed();
     deployed.set('l1ERC20Token', l1token.address);
     console.log('2-1: L1 ERC20 deployed to:', l1token.address);
@@ -44,8 +46,10 @@ async function main(): Promise<void> {
 
   // deploy L2 contracts
   if (deployed.get('l2ERC20Token') == null) {
-    const L2ERC20Token = new L2Token__factory(l2Wallet);
-    const l2token = await L2ERC20Token.deploy(deployed.get('l2CustomGateway'), deployed.get('l1ERC20Token'));
+    const l2token = await new L2Token__factory(l2Wallet).deploy(
+      deployed.get('l2CustomGateway'),
+      deployed.get('l1ERC20Token')
+    );
     await l2token.deployed();
     deployed.set('l2ERC20Token', l2token.address);
     console.log('2-2: L2 ERC20 deployed to:', l2token.address);
